@@ -1,16 +1,12 @@
- {
+{
   "short_name": "SKRU-XRAY",
   "name": "ระบบคิวแผนกเอกซเรย์ โรงพยาบาลสงขลา",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "/icon.png",
       "type": "image/png",
-      "sizes": "192x192"
-    },
-    {
-      "src": "/icon-512.png",
-      "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "any",
+      "purpose": "any maskable"
     }
   ],
   "start_url": "/",

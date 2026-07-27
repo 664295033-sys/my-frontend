@@ -4,10 +4,24 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- ลิงก์ไปยังไฟล์ manifest.json และกำหนดสีแถบสถานะ -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#0056b3" />
+
     <title>my-frontend</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- สคริปต์ลงทะเบียน Service Worker สำหรับ PWA -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/service-worker.js');
+        });
+      }
+    </script>
   </body>
 </html>

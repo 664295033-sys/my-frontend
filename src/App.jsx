@@ -1,31 +1,44 @@
-import React from 'react'
+import React, { useEffect } from 'react'
+import { createClient } from '@supabase/supabase-js'
 
-// Web App URL ของ Google Apps Script
-// !! สำคัญ !! ต้องเป็น URL ที่ลงท้ายด้วย /exec เท่านั้น (ไม่ใช่ /dev)
-const GAS_URL = "https://script.google.com/macros/s/AKfycbxI-ro5rN_zFz3ZlvD6xtJEP5hF0v2-G5EYzOy1gGKsZOUKsWOmgNXDOmGwLl83Rio/exec"; // <-- แทนที่ด้วย URL จริงจาก Deploy > Manage deployments
+// 1. ตั้งค่า Supabase Client
+const SUPABASE_URL = "https://mqyjmuajdqrlouqbztfn.supabase.co"
+const SUPABASE_KEY = "sb_publishable_6DUhs44893vDND_2OptDwQ_8rbOs52C" // นำมาจาก Supabase > Project Settings > API
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+const GAS_URL = "https://script.google.com/macros/s/AKfycbx1-ro5rN_zFz3Zlvd6xtJEP5hf0v2-G5EYzOy1gGKsZOUKsw0mgNXD0mGwLl83Rio/exec"
 
 export default function App() {
+
+  useEffect(() => {
+    // 2. ฟังก์ชันดักฟังข้อความที่ส่งมาจาก iframe (GAS)
+    const handleMessage = async (event) => {
+      // ตรวจสอบข้อมูลคิวที่ส่งมาจากหน้าเว็บ
+      if (event.data && event.data.type === 'NEW_QUEUE') {
+        const { queueNo, status, counter } = event.data
+
+        // 3. บันทึกลง Supabase ทันที!
+        await supabase.from('คิวX-Ray').insert([
+          {
+            'หมายเลขคิว': queueNo,
+            'สถานะ': status || 'การโทร',
+            'ช่องบริการ': counter || 1,
+            'เวลาออกคิว': new Date().toISOString()
+          }
+        ])
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [])
+
   return (
     <iframe
       src={GAS_URL}
       title="ระบบเรียกคิวเอกซเรย์ออนไลน์"
-      // สำคัญมาก: อนุญาตให้เนื้อหาข้างใน iframe (หน้าจอทีวีของ Apps Script) ขอขยายเต็มจอได้
-      // ถ้าไม่มี 2 บรรทัดนี้ ปุ่ม "ขยายเต็มจอ" จะกดไม่ได้เลย เพราะเบราว์เซอร์บล็อก Fullscreen API
-      // ใน iframe ไว้เป็นค่าเริ่มต้นเสมอ ไม่เกี่ยวกับตัวเบราว์เซอร์ที่ใช้
+      style={{ width: '100%', height: '100vh', border: 'none' }}
       allow="fullscreen"
-      allowFullScreen
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        margin: 0,
-        padding: 0,
-        border: 'none',
-        display: 'block',
-        overflow: 'hidden'
-      }}
     />
   )
 }

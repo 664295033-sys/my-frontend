@@ -6,7 +6,7 @@ const SUPABASE_URL = "https://mqyjmuajdqrlouqbztfn.supabase.co"
 const SUPABASE_KEY = "sb_publishable_6DUhs44893vDND_2OptDwQ_8rbOs52C" // นำมาจาก Supabase > Project Settings > API
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-const GAS_URL = "https://script.google.com/macros/s/AKfycbx1-ro5rN_zFz3Zlvd6xtJEP5hf0v2-G5EYzOy1gGKsZOUKsw0mgNXD0mGwLl83Rio/exec"
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxI-ro5rN_zFz3ZlvD6xtJEP5hF0v2-G5EYzOy1gGKsZOUKsWOmgNXDOmGwLl83Rio/exec"
 
 export default function App() {
 

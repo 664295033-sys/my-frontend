@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRealtimeQueues } from './lib/useRealtimeQueues';
 import { useRealtimeStaff } from './lib/useRealtimeStaff';
 import { insertQueue, callNext, skipQueue, completeQueue, callSkipped, resetAllQueues } from './lib/queueApi';
-import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPassword, changeOwnPassword, updateStaffAvatar, deleteStaff, resetPasswordByEmail } from './lib/staffApi';
+import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPassword, changeOwnPassword, updateStaffAvatar, deleteStaff, requestPasswordResetCode, verifyResetCodeAndSetPassword } from './lib/staffApi';
 import { QUEUE_TYPES, getTypeInfo, getSourceLabel, ROLE_INFO, PREFIX_READING } from './lib/constants';
 import { getTodayToken, buildScanUrl } from './lib/Qrtoken';
 import { printQueueTicket } from './lib/printTicket';
@@ -509,29 +509,47 @@ function LoginView({ onLoggedIn }) {
   const [registerForm, setRegisterForm] = useState({ fullName: '', position: '', username: '', password: '', email: '', inviteCode: '' });
 
   const [showForgotModal, setShowForgotModal] = useState(false);
-  const [forgotStep, setForgotStep] = useState('verify'); // 'verify' | 'reset'
-  const [forgotForm, setForgotForm] = useState({ username: '', email: '', newPassword: '', confirmPassword: '' });
+  const [forgotStep, setForgotStep] = useState('verify'); // 'verify' | 'code'
+  const [forgotForm, setForgotForm] = useState({ username: '', email: '', code: '', newPassword: '', confirmPassword: '' });
   const [forgotError, setForgotError] = useState('');
+  const [forgotInfo, setForgotInfo] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
 
   const openForgotModal = () => {
     setForgotStep('verify');
-    setForgotForm({ username: '', email: '', newPassword: '', confirmPassword: '' });
+    setForgotForm({ username: '', email: '', code: '', newPassword: '', confirmPassword: '' });
     setForgotError('');
+    setForgotInfo('');
     setShowForgotModal(true);
   };
 
-  const handleForgotVerify = () => {
+  const handleSendResetCode = async () => {
     setForgotError('');
     if (!forgotForm.username.trim() || !forgotForm.email.trim()) {
       setForgotError('กรุณากรอกชื่อบัญชีและอีเมลให้ครบ');
       return;
     }
-    setForgotStep('reset');
+    setForgotLoading(true);
+    try {
+      const result = await requestPasswordResetCode(forgotForm.username.trim(), forgotForm.email.trim());
+      if (result.ok) {
+        setForgotInfo(`ส่งรหัสยืนยันไปที่ ${forgotForm.email.trim()} แล้ว กรุณาตรวจสอบอีเมล (รวมถึงถังขยะ/สแปม)`);
+        setForgotStep('code');
+      } else {
+        setForgotError(result.message || 'ทำรายการไม่สำเร็จ');
+      }
+    } catch (err) {
+      setForgotError('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่');
+    }
+    setForgotLoading(false);
   };
 
   const handleForgotReset = async () => {
     setForgotError('');
+    if (!forgotForm.code.trim()) {
+      setForgotError('กรุณากรอกรหัสยืนยันที่ได้รับทางอีเมล');
+      return;
+    }
     if (!forgotForm.newPassword || forgotForm.newPassword.length < 6) {
       setForgotError('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร');
       return;
@@ -542,18 +560,25 @@ function LoginView({ onLoggedIn }) {
     }
     setForgotLoading(true);
     try {
-      const result = await resetPasswordByEmail(forgotForm.username.trim(), forgotForm.email.trim(), forgotForm.newPassword);
+      const result = await verifyResetCodeAndSetPassword(forgotForm.username.trim(), forgotForm.code.trim(), forgotForm.newPassword);
       if (result.ok) {
         setShowForgotModal(false);
         setLoginForm({ username: forgotForm.username.trim(), password: '' });
         alert('ตั้งรหัสผ่านใหม่สำเร็จแล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่');
       } else {
-        setForgotError(result.message || 'ทำรายการไม่สำเร็จ');
+        setForgotError(result.message || 'รหัสยืนยันไม่ถูกต้องหรือหมดอายุ');
       }
     } catch (err) {
       setForgotError('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่');
     }
     setForgotLoading(false);
+  };
+
+  const handleResendCode = () => {
+    setForgotStep('verify');
+    setForgotForm(f => ({ ...f, code: '' }));
+    setForgotError('');
+    setForgotInfo('');
   };
 
   const handleLogin = async () => {
@@ -653,7 +678,7 @@ function LoginView({ onLoggedIn }) {
 
             {forgotStep === 'verify' ? (
               <div className="space-y-3">
-                <p className="text-xs text-gray-500">กรอกชื่อบัญชีและอีเมลที่ลงทะเบียนไว้ตอนสมัคร เพื่อยืนยันตัวตนก่อนตั้งรหัสผ่านใหม่</p>
+                <p className="text-xs text-gray-500">กรอกชื่อบัญชีและอีเมลที่ลงทะเบียนไว้ตอนสมัคร ระบบจะส่งรหัสยืนยัน 6 หลักไปให้ทางอีเมลเพื่อใช้ตั้งรหัสผ่านใหม่</p>
                 <input
                   type="text"
                   placeholder="ชื่อบัญชีผู้ใช้ (Username)"
@@ -667,15 +692,27 @@ function LoginView({ onLoggedIn }) {
                   value={forgotForm.email}
                   onChange={(e) => { setForgotForm(f => ({ ...f, email: e.target.value })); setForgotError(''); }}
                   className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm"
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleForgotVerify(); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSendResetCode(); }}
                 />
                 {forgotError && <p className="text-red-500 text-xs font-bold text-center">{forgotError}</p>}
-                <button onClick={handleForgotVerify} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl">
-                  ถัดไป
+                <button onClick={handleSendResetCode} disabled={forgotLoading} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl">
+                  {forgotLoading ? 'กำลังส่งรหัสยืนยัน...' : 'ส่งรหัสยืนยันไปยังอีเมล'}
                 </button>
               </div>
             ) : (
               <div className="space-y-3">
+                {forgotInfo && (
+                  <p className="text-xs text-emerald-600 font-semibold bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">{forgotInfo}</p>
+                )}
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="รหัสยืนยัน 6 หลักจากอีเมล"
+                  value={forgotForm.code}
+                  onChange={(e) => { setForgotForm(f => ({ ...f, code: e.target.value.replace(/[^\d]/g, '') })); setForgotError(''); }}
+                  className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-center text-lg font-black tracking-[0.3em]"
+                />
                 <input
                   type="password"
                   placeholder="รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)"
@@ -695,8 +732,8 @@ function LoginView({ onLoggedIn }) {
                 <button onClick={handleForgotReset} disabled={forgotLoading} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl">
                   {forgotLoading ? 'กำลังบันทึก...' : 'ยืนยันและตั้งรหัสผ่านใหม่'}
                 </button>
-                <button onClick={() => setForgotStep('verify')} className="w-full text-xs text-gray-400 font-semibold text-center">
-                  ย้อนกลับ
+                <button onClick={handleResendCode} disabled={forgotLoading} className="w-full text-xs text-emerald-600 font-semibold text-center hover:underline">
+                  ยังไม่ได้รับรหัส? ขอรหัสใหม่
                 </button>
               </div>
             )}

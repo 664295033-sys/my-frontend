@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import emailjs from '@emailjs/browser';
 
 const TABLE = 'staff';
 
@@ -132,13 +133,26 @@ export async function deleteStaff(targetId) {
 }
 
 // ==========================================================
-// ลืมรหัสผ่าน (self-service ฝั่ง client ล้วน ไม่มีเซิร์ฟเวอร์ส่งอีเมลจริง)
-// ตรวจสอบว่า username + email ตรงกับที่ลงทะเบียนไว้ ถ้าตรง อนุญาตให้ตั้งรหัสผ่านใหม่ได้เลย
+// ลืมรหัสผ่าน — ส่งรหัสยืนยัน 6 หลักไปทางอีเมลจริงผ่าน EmailJS (ส่งจาก browser ตรงๆ ไม่ต้องมีเซิร์ฟเวอร์)
+// ต้องสมัคร emailjs.com (ฟรี) แล้วใส่ 3 ค่าด้านล่างให้ครบก่อนถึงจะส่งอีเมลได้จริง:
+//   1. Add Email Service (เช่นเชื่อม Gmail) -> ได้ SERVICE_ID
+//   2. สร้าง Email Template ที่มีตัวแปร {{to_email}} และ {{code}} ในเนื้อหา -> ได้ TEMPLATE_ID
+//   3. Account -> General -> Public Key -> ได้ PUBLIC_KEY
+// ต้องรัน: npm install @emailjs/browser
+// และต้องรัน SQL นี้ใน Supabase ก่อนใช้งาน (เพิ่มคอลัมน์เก็บรหัสยืนยัน):
+//   alter table staff add column if not exists reset_code text;
+//   alter table staff add column if not exists reset_code_expires timestamptz;
 // ==========================================================
-export async function resetPasswordByEmail(username, email, newPassword) {
-  if (!newPassword || newPassword.length < 6) {
-    return { ok: false, message: 'รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร' };
-  }
+const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID';
+const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';
+const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY';
+
+function generateResetCode() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// ขั้นที่ 1: ยืนยัน username+email ตรงกับที่ลงทะเบียนไว้ แล้วส่งรหัสยืนยัน 6 หลักไปอีเมลจริง
+export async function requestPasswordResetCode(username, email) {
   const { data, error } = await supabase
     .from(TABLE)
     .select('id, email')
@@ -149,6 +163,50 @@ export async function resetPasswordByEmail(username, email, newPassword) {
   if (!data.email || data.email.trim().toLowerCase() !== email.trim().toLowerCase()) {
     return { ok: false, message: 'อีเมลไม่ตรงกับที่ลงทะเบียนไว้กับบัญชีนี้' };
   }
+
+  const code = generateResetCode();
+  const expires = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+
+  const { error: updateError } = await supabase
+    .from(TABLE)
+    .update({ reset_code: code, reset_code_expires: expires })
+    .eq('id', data.id);
+  if (updateError) return { ok: false, message: updateError.message };
+
+  try {
+    await emailjs.send(
+      EMAILJS_SERVICE_ID,
+      EMAILJS_TEMPLATE_ID,
+      { to_email: email.trim(), code },
+      { publicKey: EMAILJS_PUBLIC_KEY }
+    );
+  } catch (err) {
+    return { ok: false, message: 'ส่งอีเมลไม่สำเร็จ กรุณาลองใหม่ (' + (err.text || err.message || 'unknown error') + ')' };
+  }
+
+  return { ok: true };
+}
+
+// ขั้นที่ 2: เช็ครหัสยืนยันที่คนไข้กรอกมา ตรงกับที่ระบบเก็บไว้และยังไม่หมดอายุ (10 นาที) ถึงจะตั้งรหัสผ่านใหม่ได้
+export async function verifyResetCodeAndSetPassword(username, code, newPassword) {
+  if (!newPassword || newPassword.length < 6) {
+    return { ok: false, message: 'รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร' };
+  }
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('id, reset_code, reset_code_expires')
+    .ilike('username', username)
+    .maybeSingle();
+  if (error) return { ok: false, message: error.message };
+  if (!data) return { ok: false, message: 'ไม่พบชื่อบัญชีผู้ใช้นี้ในระบบ' };
+  if (!data.reset_code || data.reset_code !== code.trim()) {
+    return { ok: false, message: 'รหัสยืนยันไม่ถูกต้อง' };
+  }
+  if (!data.reset_code_expires || new Date(data.reset_code_expires) < new Date()) {
+    return { ok: false, message: 'รหัสยืนยันหมดอายุแล้ว กรุณาขอรหัสใหม่' };
+  }
+
   await resetStaffPassword(data.id, newPassword);
+  await supabase.from(TABLE).update({ reset_code: null, reset_code_expires: null }).eq('id', data.id);
   return { ok: true };
 }

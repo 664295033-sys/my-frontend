@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRealtimeQueues } from './lib/useRealtimeQueues';
 import { useRealtimeStaff } from './lib/useRealtimeStaff';
 import { insertQueue, callNext, skipQueue, completeQueue, callSkipped, resetAllQueues } from './lib/queueApi';
-import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPassword, changeOwnPassword, updateStaffAvatar } from './lib/staffapi';
+import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPassword, changeOwnPassword, updateStaffAvatar } from './lib/staffApi';
 import { QUEUE_TYPES, getTypeInfo, getSourceLabel, ROLE_INFO } from './lib/constants';
 import { getTodayToken, buildScanUrl } from './lib/Qrtoken';
 import { printQueueTicket } from './lib/printTicket';

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRealtimeQueues } from './lib/useRealtimeQueues';
 import { useRealtimeStaff } from './lib/useRealtimeStaff';
 import { insertQueue, callNext, skipQueue, completeQueue, callSkipped, resetAllQueues } from './lib/queueApi';
-import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPassword, changeOwnPassword, updateStaffAvatar } from './lib/staffApi';
+import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPassword, changeOwnPassword, updateStaffAvatar } from './lib/staffapi';
 import { QUEUE_TYPES, getTypeInfo, getSourceLabel, ROLE_INFO } from './lib/constants';
 import { getTodayToken, buildScanUrl } from './lib/Qrtoken';
 import { printQueueTicket } from './lib/printTicket';
@@ -937,22 +937,13 @@ function getStoredQueueRef() {
 function clearStoredQueueRef() {
   try { localStorage.removeItem(getTodayQueueStorageKey()); } catch (e) { /* no-op */ }
 }
-// สแกนแล้วรับคิวทันที ไม่ต้องกรอกเบอร์โทร — กันคิวซ้ำด้วย "device id" แทน
-// (สุ่มครั้งเดียวเก็บไว้ใน localStorage ของเครื่อง/เบราว์เซอร์นั้น ผูกกับคิวที่ออกในวันนั้นๆ)
-// ข้อแลกเปลี่ยน: ถ้าคนไข้ล้าง localStorage หรือเปลี่ยนเครื่อง/เบราว์เซอร์กลางทาง จะรับคิวใหม่ซ้ำได้
-// (ต่างจากแบบผูกเบอร์โทรที่กันซ้ำได้แน่นกว่า เพราะยึดตัวตนจริงของคนไข้ ไม่ใช่ยึดเครื่อง)
-const DEVICE_ID_KEY = 'xray_device_id';
-function getOrCreateDeviceId() {
-  try {
-    let id = localStorage.getItem(DEVICE_ID_KEY);
-    if (!id) {
-      id = (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : `dev-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      localStorage.setItem(DEVICE_ID_KEY, id);
-    }
-    return id;
-  } catch (e) {
-    return `dev-${Date.now()}`;
-  }
+// ต้องกรอกเบอร์โทร 10 หลักยืนยันตัวตนก่อนถึงจะออกคิวให้ — กันคิวซ้ำแบบยึดตัวตนคนไข้จริง
+const IDENTIFIER_STORAGE_KEY = 'xray_patient_identifier';
+function saveIdentifierToStorage(v) {
+  try { localStorage.setItem(IDENTIFIER_STORAGE_KEY, v); } catch (e) { /* no-op */ }
+}
+function getStoredIdentifier() {
+  try { return localStorage.getItem(IDENTIFIER_STORAGE_KEY) || ''; } catch (e) { return ''; }
 }
 
 function MobileQueueView() {
@@ -961,15 +952,16 @@ function MobileQueueView() {
     const stored = getStoredQueueRef();
     return stored ? stored.id : null;
   });
-  const [issuing, setIssuing] = useState(() => !getStoredQueueRef());
-  const [issueError, setIssueError] = useState('');
+  const [showForm, setShowForm] = useState(() => !getStoredQueueRef());
+  const [identifierInput, setIdentifierInput] = useState(() => getStoredIdentifier());
+  const [identifierError, setIdentifierError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const [calledAlert, setCalledAlert] = useState(false);
   const [timeString, setTimeString] = useState('');
   const [dateString, setDateString] = useState('');
   const [scanTime, setScanTime] = useState(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const lastStatusRef = useRef(null);
-  const hasIssuedRef = useRef(false);
 
   const myQueue = queues.find(q => q.id === selectedQueueId) || null;
 
@@ -995,31 +987,33 @@ function MobileQueueView() {
     lastStatusRef.current = myQueue.status;
   }, [myQueue?.status]);
 
-  // สแกนปุ๊บรับคิวปั๊บ — ยิงตอนเปิดหน้านี้ครั้งแรกเลย ถ้ายังไม่มีคิวของวันนี้ค้างอยู่
-  useEffect(() => {
-    if (selectedQueueId || hasIssuedRef.current) { setIssuing(false); return; }
-    hasIssuedRef.current = true;
-    (async () => {
-      setIssuing(true);
-      setIssueError('');
-      const currentTimeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      setScanTime(currentTimeStr);
-      try {
-        const deviceId = getOrCreateDeviceId();
-        const result = await insertQueue({ source: 'mobile', identifier: deviceId, queueType: 'xray' });
-        saveQueueRefToStorage(result.queue);
-        lastStatusRef.current = result.queue.status;
-        setSelectedQueueId(result.queue.id);
-        playNewQueueChime();
-        setShowSuccessToast(true);
-        setTimeout(() => setShowSuccessToast(false), 5000);
-      } catch (err) {
-        setIssueError('เกิดข้อผิดพลาดในการรับคิว กรุณาลองสแกนใหม่อีกครั้ง');
-      }
-      setIssuing(false);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const validateIdentifier = (v) => {
+    if (!/^0\d{9}$/.test(v.trim())) return 'กรุณากรอกเบอร์โทรศัพท์ 10 หลักให้ครบ (ขึ้นต้นด้วย 0)';
+    return '';
+  };
+
+  const handleSubmit = async () => {
+    const err = validateIdentifier(identifierInput);
+    if (err) { setIdentifierError(err); return; }
+    setIdentifierError('');
+    setSubmitting(true);
+    const currentTimeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setScanTime(currentTimeStr);
+    try {
+      const result = await insertQueue({ source: 'mobile', identifier: identifierInput.trim(), queueType: 'xray' });
+      saveIdentifierToStorage(identifierInput.trim());
+      saveQueueRefToStorage(result.queue);
+      lastStatusRef.current = result.queue.status;
+      setSelectedQueueId(result.queue.id);
+      setShowForm(false);
+      playNewQueueChime();
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 5000);
+    } catch (err) {
+      setIdentifierError('เกิดข้อผิดพลาดในการออกคิว กรุณาลองใหม่');
+    }
+    setSubmitting(false);
+  };
 
   const getStatusText = () => {
     if (!myQueue) return 'ไม่พบคิวในระบบ กรุณาสแกน QR ใหม่อีกครั้ง';
@@ -1095,23 +1089,37 @@ function MobileQueueView() {
         </div>
       </div>
 
-      {issuing ? (
-        <div className="px-6 py-10 flex-grow flex flex-col justify-center items-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center animate-pulse">
-            <XRayIcon size={28} />
+      {showForm ? (
+        <div className="px-6 py-10 flex-grow flex flex-col justify-center space-y-6">
+          <div className="text-center space-y-3">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+              <XRayIcon size={28} />
+            </div>
+            <h4 className="text-lg font-bold text-gray-900">ยืนยันตัวตนก่อนรับคิว</h4>
+            <p className="text-[13px] text-gray-400 max-w-[260px] mx-auto leading-relaxed">
+              กรอกเบอร์โทรศัพท์ 10 หลัก เพื่อป้องกันการรับคิวซ้ำ แม้จะปิดหน้าจอนี้ไปแล้วก็ตาม
+            </p>
           </div>
-          <p className="text-sm font-bold text-gray-700">กำลังออกหมายเลขคิวให้คุณ...</p>
-          <p className="text-xs text-gray-400">กรุณารอสักครู่ ไม่ต้องปิดหน้าจอนี้</p>
-        </div>
-      ) : issueError ? (
-        <div className="px-6 py-10 flex-grow flex flex-col justify-center items-center space-y-4 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-red-50 text-red-500 flex items-center justify-center">⚠️</div>
-          <p className="text-sm font-bold text-red-600 max-w-[240px]">{issueError}</p>
+          <div className="space-y-2">
+            <input
+              type="tel"
+              inputMode="numeric"
+              maxLength={10}
+              value={identifierInput}
+              onChange={(e) => { setIdentifierInput(e.target.value.replace(/[^\d]/g, '')); setIdentifierError(''); }}
+              placeholder="0812345678"
+              className="w-full bg-gray-50 border border-gray-200 focus:border-emerald-400 focus:bg-white outline-none text-gray-900 text-center text-2xl font-bold tracking-[0.2em] py-4 rounded-2xl placeholder:text-gray-300 placeholder:tracking-normal placeholder:font-normal placeholder:text-base transition"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+            />
+            {identifierError && <p className="text-red-500 text-xs font-semibold text-center">{identifierError}</p>}
+          </div>
           <button
-            onClick={() => { hasIssuedRef.current = false; setIssueError(''); window.location.reload(); }}
-            className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-sm py-3 px-6 rounded-2xl transition active:scale-95"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-bold text-sm py-4 rounded-2xl transition active:scale-[0.98] shadow-lg shadow-emerald-500/20"
           >
-            ลองอีกครั้ง
+            {submitting ? 'กำลังรับคิว...' : 'ยืนยันและรับคิว'}
           </button>
         </div>
       ) : (

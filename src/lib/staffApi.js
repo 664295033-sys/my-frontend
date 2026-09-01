@@ -143,9 +143,9 @@ export async function deleteStaff(targetId) {
 //   alter table staff add column if not exists reset_code text;
 //   alter table staff add column if not exists reset_code_expires timestamptz;
 // ==========================================================
-const EMAILJS_SERVICE_ID = 'YOUR_SERVICE_ID';
-const EMAILJS_TEMPLATE_ID = 'YOUR_TEMPLATE_ID';
-const EMAILJS_PUBLIC_KEY = 'YOUR_PUBLIC_KEY';
+const EMAILJS_SERVICE_ID = 'service_vskwzxd';
+const EMAILJS_TEMPLATE_ID = 'template_76do4wd';
+const EMAILJS_PUBLIC_KEY = 'fcvO5xJpr87VQsEiR';
 
 function generateResetCode() {
   return Math.floor(100000 + Math.random() * 900000).toString();

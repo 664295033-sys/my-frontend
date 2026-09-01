@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRealtimeQueues } from './lib/useRealtimeQueues';
 import { useRealtimeStaff } from './lib/useRealtimeStaff';
 import { insertQueue, callNext, skipQueue, completeQueue, callSkipped, resetAllQueues } from './lib/queueApi';
-import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPassword, changeOwnPassword, updateStaffAvatar, deleteStaff } from './lib/staffApi';
-import { QUEUE_TYPES, getTypeInfo, getSourceLabel, ROLE_INFO } from './lib/constants';
+import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPassword, changeOwnPassword, updateStaffAvatar, deleteStaff, resetPasswordByEmail } from './lib/staffApi';
+import { QUEUE_TYPES, getTypeInfo, getSourceLabel, ROLE_INFO, PREFIX_READING } from './lib/constants';
 import { getTodayToken, buildScanUrl } from './lib/Qrtoken';
 import { printQueueTicket } from './lib/printTicket';
 
@@ -142,7 +142,69 @@ function playSkipAlert() {
 }
 
 // ==========================================================
-// ย่อ/บีบอัดรูปโปรไฟล์ฝั่ง client ก่อนอัปโหลดขึ้น Supabase (เก็บเป็น base64 data URL)
+// เสียงเรียกคิวภาษาไทย (Text-to-Speech) — เลือกเสียงไทยที่ดีที่สุดที่เครื่องมีให้
+// เก็บ voice ที่เลือกไว้ในตัวแปร module-level กันเลือกซ้ำทุกครั้งที่เรียก
+// ==========================================================
+let cachedThaiVoice = null;
+let thaiVoicePicked = false;
+function pickBestThaiVoice() {
+  if (!('speechSynthesis' in window)) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices || voices.length === 0) return null;
+  const thaiVoices = voices.filter(v => v.lang && v.lang.toLowerCase().startsWith('th'));
+  if (thaiVoices.length === 0) { thaiVoicePicked = true; return null; }
+  const scored = thaiVoices.map(v => {
+    let score = 0;
+    const name = v.name.toLowerCase();
+    if (name.includes('google')) score += 3;
+    if (name.includes('neural') || name.includes('natural') || name.includes('premium')) score += 3;
+    if (!v.localService) score += 1;
+    return { voice: v, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  cachedThaiVoice = scored[0].voice;
+  thaiVoicePicked = true;
+  return cachedThaiVoice;
+}
+if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+  window.speechSynthesis.addEventListener('voiceschanged', pickBestThaiVoice);
+}
+
+// พูดหมายเลขคิวเป็นภาษาไทย เช่น "ขอเชิญหมายเลข เอ็กซ์ ศูนย์ ศูนย์ หนึ่ง ที่ช่องบริการที่ 1"
+function speakQueue(queueNo, counterNo) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  if (!thaiVoicePicked) pickBestThaiVoice();
+  const queueNoStr = String(queueNo);
+  const prefixLetter = queueNoStr.charAt(0).toUpperCase();
+  const prefixReading = PREFIX_READING[prefixLetter] || prefixLetter;
+  const digits = queueNoStr.slice(1).split('').join(' ');
+  const text = `ขอเชิญหมายเลข, ${prefixReading}, ${digits}, ที่ช่องบริการที่ ${counterNo}`;
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'th-TH';
+  utterance.rate = 0.62;
+  utterance.pitch = 1.0;
+  utterance.volume = 1;
+  if (cachedThaiVoice) utterance.voice = cachedThaiVoice;
+  window.speechSynthesis.speak(utterance);
+}
+
+// ==========================================================
+// โหลด html2canvas จาก CDN แบบ lazy (ใช้ตอนบันทึกภาพบัตรคิวบนมือถือคนไข้เท่านั้น)
+// ==========================================================
+let html2canvasLoadingPromise = null;
+function loadHtml2Canvas() {
+  if (window.html2canvas) return Promise.resolve(window.html2canvas);
+  if (html2canvasLoadingPromise) return html2canvasLoadingPromise;
+  html2canvasLoadingPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    script.onload = () => resolve(window.html2canvas);
+    script.onerror = () => reject(new Error('โหลดตัวช่วยบันทึกภาพไม่สำเร็จ ลองใหม่อีกครั้ง'));
+    document.head.appendChild(script);
+  });
+  return html2canvasLoadingPromise;
+}
 // ==========================================================
 function resizeImageToDataUrl(file, maxSize = 200, quality = 0.7) {
   return new Promise((resolve, reject) => {
@@ -446,6 +508,54 @@ function LoginView({ onLoggedIn }) {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [registerForm, setRegisterForm] = useState({ fullName: '', position: '', username: '', password: '', email: '', inviteCode: '' });
 
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotStep, setForgotStep] = useState('verify'); // 'verify' | 'reset'
+  const [forgotForm, setForgotForm] = useState({ username: '', email: '', newPassword: '', confirmPassword: '' });
+  const [forgotError, setForgotError] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  const openForgotModal = () => {
+    setForgotStep('verify');
+    setForgotForm({ username: '', email: '', newPassword: '', confirmPassword: '' });
+    setForgotError('');
+    setShowForgotModal(true);
+  };
+
+  const handleForgotVerify = () => {
+    setForgotError('');
+    if (!forgotForm.username.trim() || !forgotForm.email.trim()) {
+      setForgotError('กรุณากรอกชื่อบัญชีและอีเมลให้ครบ');
+      return;
+    }
+    setForgotStep('reset');
+  };
+
+  const handleForgotReset = async () => {
+    setForgotError('');
+    if (!forgotForm.newPassword || forgotForm.newPassword.length < 6) {
+      setForgotError('รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร');
+      return;
+    }
+    if (forgotForm.newPassword !== forgotForm.confirmPassword) {
+      setForgotError('รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const result = await resetPasswordByEmail(forgotForm.username.trim(), forgotForm.email.trim(), forgotForm.newPassword);
+      if (result.ok) {
+        setShowForgotModal(false);
+        setLoginForm({ username: forgotForm.username.trim(), password: '' });
+        alert('ตั้งรหัสผ่านใหม่สำเร็จแล้ว กรุณาเข้าสู่ระบบด้วยรหัสผ่านใหม่');
+      } else {
+        setForgotError(result.message || 'ทำรายการไม่สำเร็จ');
+      }
+    } catch (err) {
+      setForgotError('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่');
+    }
+    setForgotLoading(false);
+  };
+
   const handleLogin = async () => {
     setError('');
     if (!loginForm.username.trim() || !loginForm.password) {
@@ -512,6 +622,9 @@ function LoginView({ onLoggedIn }) {
               <button onClick={handleLogin} disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl">
                 {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
               </button>
+              <button type="button" onClick={openForgotModal} className="w-full text-center text-xs font-bold text-emerald-600 hover:underline">
+                ลืมรหัสผ่าน?
+              </button>
             </>
           ) : (
             <>
@@ -529,6 +642,67 @@ function LoginView({ onLoggedIn }) {
           )}
         </div>
       </div>
+
+      {showForgotModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !forgotLoading && setShowForgotModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-bold text-gray-800 text-sm">ลืมรหัสผ่าน</h4>
+              <button onClick={() => setShowForgotModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+
+            {forgotStep === 'verify' ? (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500">กรอกชื่อบัญชีและอีเมลที่ลงทะเบียนไว้ตอนสมัคร เพื่อยืนยันตัวตนก่อนตั้งรหัสผ่านใหม่</p>
+                <input
+                  type="text"
+                  placeholder="ชื่อบัญชีผู้ใช้ (Username)"
+                  value={forgotForm.username}
+                  onChange={(e) => { setForgotForm(f => ({ ...f, username: e.target.value })); setForgotError(''); }}
+                  className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm"
+                />
+                <input
+                  type="email"
+                  placeholder="อีเมลที่ลงทะเบียนไว้"
+                  value={forgotForm.email}
+                  onChange={(e) => { setForgotForm(f => ({ ...f, email: e.target.value })); setForgotError(''); }}
+                  className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleForgotVerify(); }}
+                />
+                {forgotError && <p className="text-red-500 text-xs font-bold text-center">{forgotError}</p>}
+                <button onClick={handleForgotVerify} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl">
+                  ถัดไป
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <input
+                  type="password"
+                  placeholder="รหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร)"
+                  value={forgotForm.newPassword}
+                  onChange={(e) => { setForgotForm(f => ({ ...f, newPassword: e.target.value })); setForgotError(''); }}
+                  className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm"
+                />
+                <input
+                  type="password"
+                  placeholder="ยืนยันรหัสผ่านใหม่"
+                  value={forgotForm.confirmPassword}
+                  onChange={(e) => { setForgotForm(f => ({ ...f, confirmPassword: e.target.value })); setForgotError(''); }}
+                  className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm"
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleForgotReset(); }}
+                />
+                {forgotError && <p className="text-red-500 text-xs font-bold text-center">{forgotError}</p>}
+                <button onClick={handleForgotReset} disabled={forgotLoading} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl">
+                  {forgotLoading ? 'กำลังบันทึก...' : 'ยืนยันและตั้งรหัสผ่านใหม่'}
+                </button>
+                <button onClick={() => setForgotStep('verify')} className="w-full text-xs text-gray-400 font-semibold text-center">
+                  ย้อนกลับ
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -578,7 +752,9 @@ function StaffDeskView() {
   };
 
   const handleRecall = () => {
+    if (!activeQueue) return;
     playBeep();
+    speakQueue(activeQueue.queue_no, selectedCounter);
   };
 
   return (
@@ -633,7 +809,7 @@ function StaffDeskView() {
                   <span>{q.queue_no}</span>
                   <div className="ml-auto flex items-center gap-1">
                     {COUNTERS.map(c => (
-                      <button key={c} onClick={() => run(async () => { await callSkipped(q.id, c); playBeep(); })} disabled={busy} className="px-1.5 py-0.5 text-[10px] hover:bg-red-200 rounded-md">ช่อง{c}</button>
+                      <button key={c} onClick={() => run(async () => { await callSkipped(q.id, c); playBeep(); speakQueue(q.queue_no, c); })} disabled={busy} className="px-1.5 py-0.5 text-[10px] hover:bg-red-200 rounded-md">ช่อง{c}</button>
                     ))}
                   </div>
                 </div>
@@ -672,7 +848,7 @@ function StaffDeskView() {
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => run(async () => { await callNext(selectedCounter, callTypeFilter); playBeep(); })} disabled={busy || activeQueue != null} className="col-span-2 py-3 rounded-xl font-bold text-sm bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-gray-100 disabled:text-gray-400">เรียกคิวถัดไป</button>
+            <button onClick={() => run(async () => { const called = await callNext(selectedCounter, callTypeFilter); playBeep(); if (called && called.queue_no) speakQueue(called.queue_no, selectedCounter); })} disabled={busy || activeQueue != null} className="col-span-2 py-3 rounded-xl font-bold text-sm bg-emerald-600 hover:bg-emerald-700 text-white disabled:bg-gray-100 disabled:text-gray-400">เรียกคิวถัดไป</button>
             <button onClick={handleRecall} disabled={busy || !activeQueue} className="py-2.5 rounded-xl font-semibold text-sm bg-amber-100 hover:bg-amber-200 text-amber-700 disabled:bg-gray-100 disabled:text-gray-400">เรียกซ้ำ</button>
             <button onClick={() => activeQueue && run(async () => { await skipQueue(activeQueue.id); playSkipAlert(); })} disabled={busy || !activeQueue} className="py-2.5 rounded-xl font-semibold text-sm bg-red-100 hover:bg-red-200 text-red-700 disabled:bg-gray-100 disabled:text-gray-400">ข้ามคิว</button>
             <button onClick={() => activeQueue && run(() => completeQueue(activeQueue.id))} disabled={busy || !activeQueue} className="col-span-2 py-2.5 rounded-xl font-semibold text-sm bg-green-100 hover:bg-green-200 text-green-700 disabled:bg-gray-100 disabled:text-gray-400">บริการเสร็จสิ้น</button>
@@ -973,9 +1149,46 @@ function MobileQueueView() {
   const [dateString, setDateString] = useState('');
   const [scanTime, setScanTime] = useState(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [downloadingImage, setDownloadingImage] = useState(false);
   const lastStatusRef = useRef(null);
+  const queueCardRef = useRef(null);
 
   const myQueue = queues.find(q => q.id === selectedQueueId) || null;
+
+  const downloadQueueImage = async () => {
+    if (!queueCardRef.current || !myQueue) return;
+    setDownloadingImage(true);
+    try {
+      const html2canvas = await loadHtml2Canvas();
+      const canvas = await html2canvas(queueCardRef.current, { backgroundColor: '#ffffff', scale: 2, useCORS: true });
+      canvas.toBlob(async (blob) => {
+        if (!blob) { setDownloadingImage(false); return; }
+        const fileName = `คิวเอกซเรย์-${myQueue.queue_no}.png`;
+        const file = new File([blob], fileName, { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], title: `คิวเอกซเรย์ ${myQueue.queue_no}` });
+            setDownloadingImage(false);
+            return;
+          } catch (shareErr) {
+            if (shareErr && shareErr.name === 'AbortError') { setDownloadingImage(false); return; }
+          }
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = fileName;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        setDownloadingImage(false);
+      }, 'image/png');
+    } catch (err) {
+      alert(err.message || 'ไม่สามารถบันทึกภาพคิวได้');
+      setDownloadingImage(false);
+    }
+  };
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1140,7 +1353,7 @@ function MobileQueueView() {
             <div className="text-center py-10 text-gray-400 text-sm">กำลังโหลดข้อมูลคิว...</div>
           ) : (
             <div className="space-y-4">
-              <div className="bg-white border border-gray-100 rounded-3xl p-6 text-center shadow-sm relative overflow-hidden">
+              <div ref={queueCardRef} className="bg-white border border-gray-100 rounded-3xl p-6 text-center shadow-sm relative overflow-hidden">
                 <XRayIcon size={120} className="absolute -right-6 -top-6 text-emerald-50 pointer-events-none" />
                 {scanTime && (
                   <div className="absolute top-0 right-0 bg-gray-50 text-gray-400 text-[9px] font-semibold px-3 py-1.5 rounded-bl-2xl tracking-wide">
@@ -1169,6 +1382,14 @@ function MobileQueueView() {
                   )}
                 </div>
               </div>
+
+              <button
+                onClick={downloadQueueImage}
+                disabled={downloadingImage}
+                className="w-full bg-emerald-50 hover:bg-emerald-100 disabled:opacity-60 text-emerald-700 font-bold text-sm py-3 rounded-2xl transition active:scale-[0.98] flex items-center justify-center gap-2"
+              >
+                {downloadingImage ? 'กำลังบันทึกภาพ...' : '📷 บันทึกภาพบัตรคิว'}
+              </button>
 
               <div className="space-y-2 pt-1">
                 <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest text-left px-1">สถานะคิวปัจจุบันที่หน้าห้องตรวจ</h4>

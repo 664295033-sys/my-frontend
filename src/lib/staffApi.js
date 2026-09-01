@@ -130,3 +130,25 @@ export async function deleteStaff(targetId) {
   if (!data || data.length === 0) return { ok: false, message: 'ลบไม่สำเร็จ: ไม่มีสิทธิ์ลบ (เช็ค Row Level Security ของตาราง staff ใน Supabase ให้อนุญาต DELETE)' };
   return { ok: true };
 }
+
+// ==========================================================
+// ลืมรหัสผ่าน (self-service ฝั่ง client ล้วน ไม่มีเซิร์ฟเวอร์ส่งอีเมลจริง)
+// ตรวจสอบว่า username + email ตรงกับที่ลงทะเบียนไว้ ถ้าตรง อนุญาตให้ตั้งรหัสผ่านใหม่ได้เลย
+// ==========================================================
+export async function resetPasswordByEmail(username, email, newPassword) {
+  if (!newPassword || newPassword.length < 6) {
+    return { ok: false, message: 'รหัสผ่านใหม่ต้องมีอย่างน้อย 6 ตัวอักษร' };
+  }
+  const { data, error } = await supabase
+    .from(TABLE)
+    .select('id, email')
+    .ilike('username', username)
+    .maybeSingle();
+  if (error) return { ok: false, message: error.message };
+  if (!data) return { ok: false, message: 'ไม่พบชื่อบัญชีผู้ใช้นี้ในระบบ' };
+  if (!data.email || data.email.trim().toLowerCase() !== email.trim().toLowerCase()) {
+    return { ok: false, message: 'อีเมลไม่ตรงกับที่ลงทะเบียนไว้กับบัญชีนี้' };
+  }
+  await resetStaffPassword(data.id, newPassword);
+  return { ok: true };
+}

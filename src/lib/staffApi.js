@@ -79,20 +79,23 @@ export async function getAllStaff() {
 }
 
 export async function setStaffApproval(targetId, approved) {
-  const { error } = await supabase.from(TABLE).update({ status: approved ? 'approved' : 'pending' }).eq('id', targetId);
+  const { data, error } = await supabase.from(TABLE).update({ status: approved ? 'approved' : 'pending' }).eq('id', targetId).select();
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error('อัปเดตไม่สำเร็จ: ไม่มีสิทธิ์แก้ไข (เช็ค Row Level Security ของตาราง staff ใน Supabase ให้อนุญาต UPDATE)');
 }
 
 export async function setStaffRole(targetId, role) {
-  const { error } = await supabase.from(TABLE).update({ role }).eq('id', targetId);
+  const { data, error } = await supabase.from(TABLE).update({ role }).eq('id', targetId).select();
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error('อัปเดตไม่สำเร็จ: ไม่มีสิทธิ์แก้ไข (เช็ค Row Level Security ของตาราง staff ใน Supabase ให้อนุญาต UPDATE)');
 }
 
 export async function resetStaffPassword(targetId, newPassword) {
   const salt = generateSalt();
   const password_hash = await sha256Hex(newPassword + salt);
-  const { error } = await supabase.from(TABLE).update({ password_hash, salt }).eq('id', targetId);
+  const { data, error } = await supabase.from(TABLE).update({ password_hash, salt }).eq('id', targetId).select();
   if (error) throw error;
+  if (!data || data.length === 0) throw new Error('รีเซ็ตรหัสผ่านไม่สำเร็จ: ไม่มีสิทธิ์แก้ไข (เช็ค Row Level Security ของตาราง staff ใน Supabase ให้อนุญาต UPDATE)');
 }
 
 export async function changeOwnPassword(staffId, oldPassword, newPassword) {
@@ -116,4 +119,14 @@ export async function updateStaffAvatar(staffId, avatarDataUrl) {
   const { error } = await supabase.from(TABLE).update({ avatar_url: avatarDataUrl }).eq('id', staffId);
   if (error) return { ok: false, message: error.message };
   return { ok: true, avatar_url: avatarDataUrl };
+}
+
+// ==========================================================
+// ลบบัญชีเจ้าหน้าที่ทิ้งถาวร (ใช้ในหน้าจัดการสิทธิ์ โดยผู้ดูแลระบบเท่านั้น)
+// ==========================================================
+export async function deleteStaff(targetId) {
+  const { data, error } = await supabase.from(TABLE).delete().eq('id', targetId).select();
+  if (error) return { ok: false, message: error.message };
+  if (!data || data.length === 0) return { ok: false, message: 'ลบไม่สำเร็จ: ไม่มีสิทธิ์ลบ (เช็ค Row Level Security ของตาราง staff ใน Supabase ให้อนุญาต DELETE)' };
+  return { ok: true };
 }

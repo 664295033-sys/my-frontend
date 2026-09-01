@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRealtimeQueues } from './lib/useRealtimeQueues';
 import { useRealtimeStaff } from './lib/useRealtimeStaff';
 import { insertQueue, callNext, skipQueue, completeQueue, callSkipped, resetAllQueues } from './lib/queueApi';
-import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPassword, changeOwnPassword, updateStaffAvatar } from './lib/staffApi';
+import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPassword, changeOwnPassword, updateStaffAvatar, deleteStaff } from './lib/staffApi';
 import { QUEUE_TYPES, getTypeInfo, getSourceLabel, ROLE_INFO } from './lib/constants';
 import { getTodayToken, buildScanUrl } from './lib/Qrtoken';
 import { printQueueTicket } from './lib/printTicket';
@@ -24,6 +24,18 @@ function XRayIcon({ size = 24, className = "" }) {
       <circle cx="8" cy="6.2" r="0.9" fill="currentColor" stroke="none" />
       <circle cx="12" cy="5.2" r="0.9" fill="currentColor" stroke="none" />
       <circle cx="16" cy="6.2" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+// ไอคอนถังขยะ — ใช้กับปุ่มลบบัญชีเจ้าหน้าที่ในหน้าจัดการสิทธิ์
+function TrashIcon({ size = 14, className = "" }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" /><path d="M14 11v6" />
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
     </svg>
   );
 }
@@ -1190,17 +1202,39 @@ function MobileQueueView() {
 function StaffManagementView({ currentStaffId }) {
   const { staff: staffList, loading } = useRealtimeStaff();
   const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState(null);
 
-  const run = async (fn) => {
+  const run = async (fn, successMsg) => {
     setBusy(true);
-    try { await fn(); } catch (err) { alert(err.message); }
+    try {
+      await fn();
+      if (successMsg) {
+        setToast({ type: 'success', message: successMsg });
+        setTimeout(() => setToast(null), 3000);
+      }
+    } catch (err) {
+      alert(err.message);
+    }
     setBusy(false);
+  };
+
+  const handleDelete = (s) => {
+    if (!window.confirm(`ต้องการลบบัญชี "${s.username}" (${s.full_name}) ทิ้งถาวรใช่หรือไม่? การลบนี้กู้คืนไม่ได้`)) return;
+    run(async () => {
+      const result = await deleteStaff(s.id);
+      if (!result.ok) throw new Error(result.message);
+    }, `ลบบัญชี ${s.username} เรียบร้อยแล้ว`);
   };
 
   if (loading) return <p className="text-gray-400 text-center py-10">กำลังโหลด...</p>;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6 border border-emerald-100">
+    <div className="bg-white rounded-2xl shadow-sm p-6 border border-emerald-100 relative">
+      {toast && (
+        <div className="absolute top-3 right-3 bg-emerald-600 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-lg z-10">
+          {toast.message}
+        </div>
+      )}
       <h3 className="text-lg font-bold text-gray-800 mb-4">จัดการและพิจารณาอนุมัติสิทธิ์เจ้าหน้าที่</h3>
       <table className="w-full text-sm">
         <thead>
@@ -1225,7 +1259,7 @@ function StaffManagementView({ currentStaffId }) {
                   <div className="flex flex-wrap items-center gap-1.5">
                     {!isApproved && (
                       <button
-                        onClick={() => run(() => setStaffApproval(s.id, true))}
+                        onClick={() => run(() => setStaffApproval(s.id, true), `อนุมัติ ${s.username} เรียบร้อยแล้ว`)}
                         disabled={busy}
                         className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold px-2 py-1 rounded-md text-[10px] disabled:opacity-50"
                       >
@@ -1234,7 +1268,7 @@ function StaffManagementView({ currentStaffId }) {
                     )}
                     {isApproved && !isSelf && (
                       <button
-                        onClick={() => run(() => setStaffApproval(s.id, false))}
+                        onClick={() => run(() => setStaffApproval(s.id, false), `ระงับสิทธิ์ ${s.username} เรียบร้อยแล้ว`)}
                         disabled={busy}
                         className="bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold px-2 py-1 rounded-md text-[10px] disabled:opacity-50"
                       >
@@ -1244,7 +1278,7 @@ function StaffManagementView({ currentStaffId }) {
                     {!isSelf && (
                       <select
                         value={s.role}
-                        onChange={(e) => run(() => setStaffRole(s.id, e.target.value))}
+                        onChange={(e) => run(() => setStaffRole(s.id, e.target.value), `เปลี่ยนสิทธิ์ ${s.username} เรียบร้อยแล้ว`)}
                         disabled={busy}
                         className="border border-gray-200 rounded-md px-1.5 py-1 text-[10px] font-bold disabled:opacity-50"
                       >
@@ -1256,13 +1290,23 @@ function StaffManagementView({ currentStaffId }) {
                     <button
                       onClick={() => {
                         const newPassword = window.prompt(`ตั้งรหัสผ่านใหม่ให้ ${s.username}`);
-                        if (newPassword) run(() => resetStaffPassword(s.id, newPassword));
+                        if (newPassword) run(() => resetStaffPassword(s.id, newPassword), `รีเซ็ตรหัสผ่าน ${s.username} เรียบร้อยแล้ว`);
                       }}
                       disabled={busy}
                       className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-2 py-1 rounded-md text-[10px] disabled:opacity-50"
                     >
                       รีเซ็ตรหัสผ่าน
                     </button>
+                    {!isSelf && (
+                      <button
+                        onClick={() => handleDelete(s)}
+                        disabled={busy}
+                        title={`ลบบัญชี ${s.username}`}
+                        className="bg-red-50 hover:bg-red-100 text-red-600 font-bold p-1.5 rounded-md disabled:opacity-50 flex items-center justify-center"
+                      >
+                        <TrashIcon size={14} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

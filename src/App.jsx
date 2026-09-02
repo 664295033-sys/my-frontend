@@ -205,6 +205,68 @@ function loadHtml2Canvas() {
   });
   return html2canvasLoadingPromise;
 }
+
+// ==========================================================
+// โหลด SheetJS (xlsx) จาก CDN แบบ lazy — ใช้ตอนดาวน์โหลดรายงานเป็นไฟล์ Excel
+// ==========================================================
+let xlsxLoadingPromise = null;
+function loadXLSX() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  if (xlsxLoadingPromise) return xlsxLoadingPromise;
+  xlsxLoadingPromise = new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    script.onload = () => resolve(window.XLSX);
+    script.onerror = () => reject(new Error('โหลดตัวช่วยสร้างไฟล์ Excel ไม่สำเร็จ ลองใหม่อีกครั้ง'));
+    document.head.appendChild(script);
+  });
+  return xlsxLoadingPromise;
+}
+
+// ==========================================================
+// สร้างไฟล์ Excel (.xlsx) จากรายงานสรุปคิว 3 ชีท: รายวัน/รายเดือน/รายปี
+// ==========================================================
+async function exportReportToExcel(daily, monthly, yearly) {
+  const XLSX = await loadXLSX();
+  const wb = XLSX.utils.book_new();
+
+  const toSheet = (rows, dateKey, dateLabel) => {
+    const data = rows.map(r => ({
+      [dateLabel]: r[dateKey],
+      'ผู้ป่วยใน (IPD)': r.ipd_count || 0,
+      'ผู้ป่วยนอก (OPD)': r.opd_count || 0,
+      'ฉุกเฉิน': r.emergency_count || 0,
+      'รวม': r.total_count || 0,
+    }));
+    return XLSX.utils.json_to_sheet(data);
+  };
+
+  XLSX.utils.book_append_sheet(wb, toSheet(daily, 'report_date', 'วันที่'), 'รายวัน');
+  XLSX.utils.book_append_sheet(wb, toSheet(monthly, 'report_month', 'เดือน'), 'รายเดือน');
+  XLSX.utils.book_append_sheet(wb, toSheet(yearly, 'report_year', 'ปี'), 'รายปี');
+
+  const today = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `รายงานสรุปคิว-โรงพยาบาลสงขลา-${today}.xlsx`);
+}
+
+// ==========================================================
+// ส่งข้อมูลรายงานไปอัปเดตที่ Google Sheet ผ่าน Google Apps Script Web App
+// ต้องสร้าง Google Sheet ใหม่ -> Extensions -> Apps Script -> วางโค้ดจากไฟล์ google_sheet_sync.gs
+// -> Deploy เป็น Web App (Execute as: Me, Who has access: Anyone) -> เอา URL มาใส่ด้านล่างนี้
+// ==========================================================
+const GOOGLE_SHEET_WEBAPP_URL = 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL';
+
+async function syncReportToGoogleSheet(daily, monthly, yearly) {
+  if (!GOOGLE_SHEET_WEBAPP_URL || GOOGLE_SHEET_WEBAPP_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+    throw new Error('ยังไม่ได้ตั้งค่า URL ของ Google Sheet กรุณาใส่ GOOGLE_SHEET_WEBAPP_URL ในโค้ดก่อน');
+  }
+  await fetch(GOOGLE_SHEET_WEBAPP_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify({ daily, monthly, yearly }),
+  });
+}
 // ==========================================================
 function resizeImageToDataUrl(file, maxSize = 200, quality = 0.7) {
   return new Promise((resolve, reject) => {
@@ -1522,6 +1584,9 @@ function ReportView() {
   const [yearly, setYearly] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -1539,11 +1604,55 @@ function ReportView() {
     })();
   }, []);
 
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      await exportReportToExcel(daily, monthly, yearly);
+    } catch (err) {
+      alert(err.message);
+    }
+    setExporting(false);
+  };
+
+  const handleSyncGoogleSheet = async () => {
+    setSyncing(true);
+    setSyncMsg('');
+    try {
+      await syncReportToGoogleSheet(daily, monthly, yearly);
+      setSyncMsg('ส่งข้อมูลไป Google Sheet เรียบร้อยแล้ว');
+    } catch (err) {
+      setSyncMsg(err.message);
+    }
+    setSyncing(false);
+    setTimeout(() => setSyncMsg(''), 5000);
+  };
+
   if (loading) return <p className="text-gray-400 text-center py-10">กำลังโหลดรายงาน...</p>;
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6 border border-emerald-100">
-      <h3 className="text-lg font-bold text-gray-800 mb-4">รายงานสรุปคิวแยกตามประเภท โรงพยาบาลสงขลา</h3>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h3 className="text-lg font-bold text-gray-800">รายงานสรุปคิวแยกตามประเภท โรงพยาบาลสงขลา</h3>
+        {!error && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportExcel}
+              disabled={exporting}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold px-4 py-2 rounded-lg text-sm"
+            >
+              {exporting ? 'กำลังสร้างไฟล์...' : '📥 ดาวน์โหลด Excel'}
+            </button>
+            <button
+              onClick={handleSyncGoogleSheet}
+              disabled={syncing}
+              className="bg-blue-50 hover:bg-blue-100 disabled:opacity-60 text-blue-700 font-bold px-4 py-2 rounded-lg text-sm border border-blue-200"
+            >
+              {syncing ? 'กำลังส่งข้อมูล...' : '📤 ส่งไป Google Sheet'}
+            </button>
+          </div>
+        )}
+      </div>
+      {syncMsg && <p className="text-xs font-semibold text-emerald-600 mb-3">{syncMsg}</p>}
       {error ? (
         <p className="text-red-500 text-sm font-semibold">{error}</p>
       ) : (

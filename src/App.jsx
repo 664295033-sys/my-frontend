@@ -254,11 +254,11 @@ async function exportReportToExcel(daily, monthly, yearly) {
 // ต้องสร้าง Google Sheet ใหม่ -> Extensions -> Apps Script -> วางโค้ดจากไฟล์ google_sheet_sync.gs
 // -> Deploy เป็น Web App (Execute as: Me, Who has access: Anyone) -> เอา URL มาใส่ด้านล่างนี้
 // ==========================================================
-const GOOGLE_SHEET_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzR-wQgCrMjPU4uSA-dAQR4j0WrAFkeGIj1QnUxr6jLR1AtQjDK1Zqw5qp4nKCWTLpy/exec';
+const GOOGLE_SHEET_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxDadsoQKpKJquEQmKExvNLVOAMssuQetSJ8BRJkfYqjG20PanvQs4DLqPSqsPf2gXa/exec';
 
 async function syncReportToGoogleSheet(daily, monthly, yearly) {
- if (!GOOGLE_SHEET_WEBAPP_URL) {
-    throw new Error('ยังไม่ได้ตั้งค่า URL ของ Google Sheet');
+  if (!GOOGLE_SHEET_WEBAPP_URL || GOOGLE_SHEET_WEBAPP_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+    throw new Error('ยังไม่ได้ตั้งค่า URL ของ Google Sheet กรุณาใส่ GOOGLE_SHEET_WEBAPP_URL ในโค้ดก่อน');
   }
   await fetch(GOOGLE_SHEET_WEBAPP_URL, {
     method: 'POST',

@@ -254,7 +254,7 @@ async function exportReportToExcel(daily, monthly, yearly) {
 // ต้องสร้าง Google Sheet ใหม่ -> Extensions -> Apps Script -> วางโค้ดจากไฟล์ google_sheet_sync.gs
 // -> Deploy เป็น Web App (Execute as: Me, Who has access: Anyone) -> เอา URL มาใส่ด้านล่างนี้
 // ==========================================================
-const GOOGLE_SHEET_WEBAPP_URL = 'https://docs.google.com/spreadsheets/d/10mqkTXRi39o2962tUvvyMF1hLqV-_R2uaA2gF3fUwcA/edit?gid=0#gid=0';
+const GOOGLE_SHEET_WEBAPP_URL = 'https://docs.google.com/spreadsheets/d/15Gkm_LY2oWU_FnfWZgelzbcDSn2g_tcDbMb1p3sVgcU/edit?gid=0#gid=0';
 
 async function syncReportToGoogleSheet(daily, monthly, yearly) {
   if (!GOOGLE_SHEET_WEBAPP_URL || GOOGLE_SHEET_WEBAPP_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {

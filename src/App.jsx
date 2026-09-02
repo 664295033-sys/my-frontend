@@ -1478,7 +1478,6 @@ function MobileQueueView() {
 // รายงานสรุปคิวแยกตามประเภท — รายวัน/รายเดือน/รายปี (หน้าตาตามชีทสรุปคิว)
 // ==========================================================
 const REPORT_TYPE_COLS = [
-  { key: 'xray_count', label: 'ทั่วไป (X-Ray)' },
   { key: 'ipd_count', label: 'ผู้ป่วยใน (IPD)' },
   { key: 'opd_count', label: 'ผู้ป่วยนอก (OPD)' },
   { key: 'emergency_count', label: 'ฉุกเฉิน' },

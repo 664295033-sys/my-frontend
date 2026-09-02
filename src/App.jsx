@@ -239,6 +239,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState(3); // 1 login, 2 desk, 3 display, 4 staff mgmt
   const [staff, setStaff] = useState(null);
   const [scanInfo] = useState(getScanParams); // อ่านครั้งเดียวตอนโหลดหน้า
+  const [loginViewKey, setLoginViewKey] = useState(0); // เปลี่ยนค่านี้เพื่อบังคับ remount LoginView ล้างฟอร์มทิ้ง
 
   // เมนูโปรไฟล์มุมขวาบน + อัปโหลดรูป + เปลี่ยนรหัสผ่าน
   const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -272,6 +273,7 @@ export default function App() {
     setStaff(null);
     clearStoredStaff();
     setActiveTab(1);
+    setLoginViewKey(k => k + 1);
   };
 
   const handleAvatarFileChange = async (e) => {
@@ -355,7 +357,7 @@ export default function App() {
           </div>
         </header>
         <main className="flex-1 flex items-center justify-center px-4 py-10">
-          <LoginView onLoggedIn={(s) => { setStaff(s); saveStaffToStorage(s); setActiveTab(2); }} />
+          <LoginView key={loginViewKey} onLoggedIn={(s) => { setStaff(s); saveStaffToStorage(s); setActiveTab(2); }} />
         </main>
       </div>
     );

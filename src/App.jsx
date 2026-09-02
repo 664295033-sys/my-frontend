@@ -257,7 +257,7 @@ async function exportReportToExcel(daily, monthly, yearly) {
 const GOOGLE_SHEET_WEBAPP_URL = 'https://docs.google.com/spreadsheets/d/15Gkm_LY2oWU_FnfWZgelzbcDSn2g_tcDbMb1p3sVgcU/edit?gid=0#gid=0';
 
 async function syncReportToGoogleSheet(daily, monthly, yearly) {
-  if (!GOOGLE_SHEET_WEBAPP_URL || GOOGLE_SHEET_WEBAPP_URL === 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL') {
+  if (!GOOGLE_SHEET_WEBAPP_URL || GOOGLE_SHEET_WEBAPP_URL === 'https://docs.google.com/spreadsheets/d/15Gkm_LY2oWU_FnfWZgelzbcDSn2g_tcDbMb1p3sVgcU/edit?gid=0#gid=0') {
     throw new Error('ยังไม่ได้ตั้งค่า URL ของ Google Sheet กรุณาใส่ GOOGLE_SHEET_WEBAPP_URL ในโค้ดก่อน');
   }
   await fetch(GOOGLE_SHEET_WEBAPP_URL, {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRealtimeQueues } from './lib/useRealtimeQueues';
 import { useRealtimeStaff } from './lib/useRealtimeStaff';
-import { insertQueue, callNext, skipQueue, completeQueue, callSkipped, resetAllQueues } from './lib/queueApi';
+import { insertQueue, callNext, skipQueue, completeQueue, callSkipped, resetAllQueues, getDailySummary, getMonthlySummary, getYearlySummary } from './lib/queueApi';
 import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPassword, changeOwnPassword, updateStaffAvatar, deleteStaff, requestPasswordResetCode, verifyResetCodeAndSetPassword } from './lib/staffApi';
 import { QUEUE_TYPES, getTypeInfo, getSourceLabel, ROLE_INFO, PREFIX_READING } from './lib/constants';
 import { getTodayToken, buildScanUrl } from './lib/Qrtoken';
@@ -354,12 +354,14 @@ export default function App() {
                 { id: 1, label: staff ? 'บัญชีเจ้าหน้าที่' : 'เข้าสู่ระบบ (เจ้าหน้าที่)' },
                 { id: 2, label: 'โต๊ะพนักงาน' },
                 { id: 3, label: 'จอแสดงผล (ทีวี)' },
+                ...(staff ? [{ id: 6, label: 'รายงานสรุปคิว' }] : []),
                 ...(staff && staff.role === 'admin' ? [{ id: 4, label: 'จัดการสิทธิ์เจ้าหน้าที่' }] : [])
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => {
                     if (tab.id === 2 && !staff) { setActiveTab(1); return; }
+                    if (tab.id === 6 && !staff) { setActiveTab(1); return; }
                     if (tab.id === 4 && (!staff || staff.role !== 'admin')) { setActiveTab(1); return; }
                     setActiveTab(tab.id);
                   }}
@@ -492,6 +494,7 @@ export default function App() {
         {activeTab === 1 && <LoginView onLoggedIn={(s) => { setStaff(s); saveStaffToStorage(s); setActiveTab(2); }} />}
         {activeTab === 2 && <StaffDeskView />}
         {activeTab === 3 && <DisplayView />}
+        {activeTab === 6 && staff && <ReportView />}
         {activeTab === 4 && staff && staff.role === 'admin' && <StaffManagementView currentStaffId={staff.id} />}
       </main>
     </div>
@@ -1457,6 +1460,88 @@ function MobileQueueView() {
 // ==========================================================
 // หน้าจัดการสิทธิ์เจ้าหน้าที่ (realtime)
 // ==========================================================
+// ==========================================================
+// รายงานสรุปคิวแยกตามประเภท — รายวัน/รายเดือน/รายปี (หน้าตาตามชีทสรุปคิว)
+// ==========================================================
+const REPORT_TYPE_COLS = [
+  { key: 'xray_count', label: 'ทั่วไป (X-Ray)' },
+  { key: 'ipd_count', label: 'ผู้ป่วยใน (IPD)' },
+  { key: 'opd_count', label: 'ผู้ป่วยนอก (OPD)' },
+  { key: 'emergency_count', label: 'ฉุกเฉิน' },
+];
+
+function ReportTable({ title, rows, dateKey, dateLabel }) {
+  return (
+    <div className="mb-6">
+      <h4 className="text-sm font-bold text-emerald-700 mb-2">📊 {title}</h4>
+      <div className="overflow-x-auto border border-gray-100 rounded-xl">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-emerald-50 text-left text-xs text-gray-600">
+              <th className="py-2 px-3 font-bold">{dateLabel}</th>
+              {REPORT_TYPE_COLS.map(c => <th key={c.key} className="py-2 px-3 font-bold">{c.label}</th>)}
+              <th className="py-2 px-3 font-bold">รวม</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i} className="border-t border-gray-50">
+                <td className="py-2 px-3 font-semibold text-gray-700">{row[dateKey]}</td>
+                {REPORT_TYPE_COLS.map(c => <td key={c.key} className="py-2 px-3 text-gray-600">{row[c.key] || 0}</td>)}
+                <td className="py-2 px-3 font-bold text-emerald-700">{row.total_count || 0}</td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={6} className="text-center text-gray-400 italic py-4">ยังไม่มีข้อมูล</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function ReportView() {
+  const [daily, setDaily] = useState([]);
+  const [monthly, setMonthly] = useState([]);
+  const [yearly, setYearly] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const [d, m, y] = await Promise.all([getDailySummary(), getMonthlySummary(), getYearlySummary()]);
+        setDaily(d);
+        setMonthly(m);
+        setYearly(y);
+      } catch (err) {
+        setError('โหลดรายงานไม่สำเร็จ: ' + err.message + ' (ต้องรัน SQL สร้าง view daily_queue_summary / monthly_queue_summary / yearly_queue_summary ใน Supabase ก่อน)');
+      }
+      setLoading(false);
+    })();
+  }, []);
+
+  if (loading) return <p className="text-gray-400 text-center py-10">กำลังโหลดรายงาน...</p>;
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm p-6 border border-emerald-100">
+      <h3 className="text-lg font-bold text-gray-800 mb-4">รายงานสรุปคิวแยกตามประเภท โรงพยาบาลสงขลา</h3>
+      {error ? (
+        <p className="text-red-500 text-sm font-semibold">{error}</p>
+      ) : (
+        <>
+          <ReportTable title="สรุปคิวแยกตามประเภท รายวัน" rows={daily} dateKey="report_date" dateLabel="วันที่" />
+          <ReportTable title="สรุปคิวแยกตามประเภท รายเดือน" rows={monthly} dateKey="report_month" dateLabel="เดือน" />
+          <ReportTable title="สรุปคิวแยกตามประเภท รายปี" rows={yearly} dateKey="report_year" dateLabel="ปี" />
+        </>
+      )}
+    </div>
+  );
+}
+
 function StaffManagementView({ currentStaffId }) {
   const { staff: staffList, loading } = useRealtimeStaff();
   const [busy, setBusy] = useState(false);

@@ -125,3 +125,25 @@ export async function resetAllQueues() {
     .in('status', ['waiting', 'calling']);
   if (error) throw error;
 }
+
+// ==========================================================
+// รายงานสรุปคิวแยกตามประเภท (รายวัน / รายเดือน / รายปี)
+// ดึงจาก view ที่สร้างไว้ใน Supabase — ต้องรัน SQL สร้าง view ก่อนใช้งาน (ดูไฟล์ report_views.sql)
+// ==========================================================
+export async function getDailySummary() {
+  const { data, error } = await supabase.from('daily_queue_summary').select('*').order('report_date', { ascending: true });
+  if (error) throw error;
+  return data;
+}
+
+export async function getMonthlySummary() {
+  const { data, error } = await supabase.from('monthly_queue_summary').select('*').order('report_month', { ascending: true });
+  if (error) throw error;
+  return data;
+}
+
+export async function getYearlySummary() {
+  const { data, error } = await supabase.from('yearly_queue_summary').select('*').order('report_year', { ascending: true });
+  if (error) throw error;
+  return data;
+}

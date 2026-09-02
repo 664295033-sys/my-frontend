@@ -349,13 +349,6 @@ export default function App() {
   if (!staff) {
     return (
       <div className="min-h-screen bg-emerald-50/60 font-sans text-gray-900 flex flex-col">
-        {toast && (
-          <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 toast-enter">
-            <div className="bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl font-medium flex items-center gap-3 border border-gray-700">
-              {toast.message}
-            </div>
-          </div>
-        )}
         <header className="bg-white shadow-sm border-b border-emerald-100 py-4">
           <div className="max-w-7xl mx-auto px-4">
             <h1 className="text-2xl font-bold tracking-tight text-emerald-600">Queue<span className="text-gray-800">System</span></h1>

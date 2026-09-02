@@ -257,8 +257,8 @@ async function exportReportToExcel(daily, monthly, yearly) {
 const GOOGLE_SHEET_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxsHzvUnaZF7c-ge3MPYDsNC-bVIh8GbD34xWeUe7vGPjM7DVxpXMLtB_CR8bkbjNW8/exec';
 
 async function syncReportToGoogleSheet(daily, monthly, yearly) {
-  if (!GOOGLE_SHEET_WEBAPP_URL || GOOGLE_SHEET_WEBAPP_URL === 'https://script.google.com/macros/s/AKfycbxsHzvUnaZF7c-ge3MPYDsNC-bVIh8GbD34xWeUe7vGPjM7DVxpXMLtB_CR8bkbjNW8/exec') {
-    throw new Error('ยังไม่ได้ตั้งค่า URL ของ Google Sheet กรุณาใส่ GOOGLE_SHEET_WEBAPP_URL ในโค้ดก่อน');
+ if (!GOOGLE_SHEET_WEBAPP_URL) {
+    throw new Error('ยังไม่ได้ตั้งค่า URL ของ Google Sheet');
   }
   await fetch(GOOGLE_SHEET_WEBAPP_URL, {
     method: 'POST',

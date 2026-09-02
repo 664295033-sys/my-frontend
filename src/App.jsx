@@ -343,6 +343,31 @@ export default function App() {
     );
   }
 
+  // ==========================================================
+  // ถ้ายังไม่ได้ล็อกอิน -> โชว์แค่หน้าล็อกอินอย่างเดียว ไม่มีแถบเมนู/แท็บใดๆ ทั้งสิ้น
+  // ==========================================================
+  if (!staff) {
+    return (
+      <div className="min-h-screen bg-emerald-50/60 font-sans text-gray-900 flex flex-col">
+        {toast && (
+          <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 toast-enter">
+            <div className="bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl font-medium flex items-center gap-3 border border-gray-700">
+              {toast.message}
+            </div>
+          </div>
+        )}
+        <header className="bg-white shadow-sm border-b border-emerald-100 py-4">
+          <div className="max-w-7xl mx-auto px-4">
+            <h1 className="text-2xl font-bold tracking-tight text-emerald-600">Queue<span className="text-gray-800">System</span></h1>
+          </div>
+        </header>
+        <main className="flex-1 flex items-center justify-center px-4 py-10">
+          <LoginView onLoggedIn={(s) => { setStaff(s); saveStaffToStorage(s); setActiveTab(2); }} />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-emerald-50/60 font-sans text-gray-900 pb-12">
       <header className="bg-white shadow-sm border-b border-emerald-100 sticky top-0 z-40">
@@ -351,18 +376,15 @@ export default function App() {
           <div className="flex items-center gap-3">
             <div className="flex bg-gray-100 p-1.5 rounded-xl overflow-x-auto">
               {[
-                { id: 1, label: staff ? 'บัญชีเจ้าหน้าที่' : 'เข้าสู่ระบบ (เจ้าหน้าที่)' },
                 { id: 2, label: 'โต๊ะพนักงาน' },
                 { id: 3, label: 'จอแสดงผล (ทีวี)' },
-                ...(staff ? [{ id: 6, label: 'รายงานสรุปคิว' }] : []),
-                ...(staff && staff.role === 'admin' ? [{ id: 4, label: 'จัดการสิทธิ์เจ้าหน้าที่' }] : [])
+                { id: 6, label: 'รายงานสรุปคิว' },
+                ...(staff.role === 'admin' ? [{ id: 4, label: 'จัดการสิทธิ์เจ้าหน้าที่' }] : [])
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => {
-                    if (tab.id === 2 && !staff) { setActiveTab(1); return; }
-                    if (tab.id === 6 && !staff) { setActiveTab(1); return; }
-                    if (tab.id === 4 && (!staff || staff.role !== 'admin')) { setActiveTab(1); return; }
+                    if (tab.id === 4 && staff.role !== 'admin') { return; }
                     setActiveTab(tab.id);
                   }}
                   className={`px-5 py-2.5 rounded-lg font-semibold text-sm whitespace-nowrap transition ${activeTab === tab.id ? 'bg-white shadow-sm text-emerald-600' : 'text-gray-500 hover:text-gray-700'
@@ -491,11 +513,10 @@ export default function App() {
       )}
 
       <main className="max-w-7xl mx-auto px-4 mt-6">
-        {activeTab === 1 && <LoginView onLoggedIn={(s) => { setStaff(s); saveStaffToStorage(s); setActiveTab(2); }} />}
         {activeTab === 2 && <StaffDeskView />}
         {activeTab === 3 && <DisplayView />}
-        {activeTab === 6 && staff && <ReportView />}
-        {activeTab === 4 && staff && staff.role === 'admin' && <StaffManagementView currentStaffId={staff.id} />}
+        {activeTab === 6 && <ReportView />}
+        {activeTab === 4 && staff.role === 'admin' && <StaffManagementView currentStaffId={staff.id} />}
       </main>
     </div>
   );

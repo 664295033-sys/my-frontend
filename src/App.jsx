@@ -254,10 +254,10 @@ async function exportReportToExcel(daily, monthly, yearly) {
 // ต้องสร้าง Google Sheet ใหม่ -> Extensions -> Apps Script -> วางโค้ดจากไฟล์ google_sheet_sync.gs
 // -> Deploy เป็น Web App (Execute as: Me, Who has access: Anyone) -> เอา URL มาใส่ด้านล่างนี้
 // ==========================================================
-const GOOGLE_SHEET_WEBAPP_URL = 'https://docs.google.com/spreadsheets/d/15Gkm_LY2oWU_FnfWZgelzbcDSn2g_tcDbMb1p3sVgcU/edit?gid=0#gid=0';
+const GOOGLE_SHEET_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxsHzvUnaZF7c-ge3MPYDsNC-bVIh8GbD34xWeUe7vGPjM7DVxpXMLtB_CR8bkbjNW8/exec';
 
 async function syncReportToGoogleSheet(daily, monthly, yearly) {
-  if (!GOOGLE_SHEET_WEBAPP_URL || GOOGLE_SHEET_WEBAPP_URL === 'https://docs.google.com/spreadsheets/d/15Gkm_LY2oWU_FnfWZgelzbcDSn2g_tcDbMb1p3sVgcU/edit?gid=0#gid=0') {
+  if (!GOOGLE_SHEET_WEBAPP_URL || GOOGLE_SHEET_WEBAPP_URL === 'https://script.google.com/macros/s/AKfycbxsHzvUnaZF7c-ge3MPYDsNC-bVIh8GbD34xWeUe7vGPjM7DVxpXMLtB_CR8bkbjNW8/exec') {
     throw new Error('ยังไม่ได้ตั้งค่า URL ของ Google Sheet กรุณาใส่ GOOGLE_SHEET_WEBAPP_URL ในโค้ดก่อน');
   }
   await fetch(GOOGLE_SHEET_WEBAPP_URL, {

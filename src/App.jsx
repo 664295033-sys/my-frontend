@@ -1562,9 +1562,6 @@ function MobileQueueView() {
 }
 
 // ==========================================================
-// หน้าจัดการสิทธิ์เจ้าหน้าที่ (realtime)
-// ==========================================================
-// ==========================================================
 // รายงานสรุปคิวแยกตามประเภท — รายวัน/รายเดือน/รายปี (หน้าตาตามชีทสรุปคิว)
 // ==========================================================
 const REPORT_TYPE_COLS = [
@@ -1656,8 +1653,8 @@ function ReportView() {
   if (loading) return <p className="text-gray-400 text-center py-10">กำลังโหลดรายงาน...</p>;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6 border border-emerald-100">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div className="bg-white rounded-2xl shadow-sm p-6 border border-emerald-100 max-h-[75vh] overflow-y-auto">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4 sticky top-0 bg-white z-10 pb-2">
         <h3 className="text-lg font-bold text-gray-800">รายงานสรุปคิวแยกตามประเภท โรงพยาบาลสงขลา</h3>
         {!error && (
           <div className="flex items-center gap-2">

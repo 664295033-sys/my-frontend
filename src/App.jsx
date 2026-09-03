@@ -880,7 +880,7 @@ function StaffDeskView() {
       <div className="flex items-center gap-3 bg-white py-2 px-3 rounded-lg shadow-sm border border-emerald-100 flex-wrap">
         <h3 className="text-sm font-bold text-gray-500">ห้องทำงานแผนกเอกซเรย์ โรงพยาบาลสงขลา</h3>
         <div className="flex items-center gap-1 border-l border-gray-200 pl-2">
-          {Object.entries(QUEUE_TYPES).filter(([k]) => k !== 'xray').map(([key, info]) => {
+          {Object.entries(QUEUE_TYPES).map(([key, info]) => {
             const count = queues.filter(q => q.queue_type === key && q.status === 'waiting').length;
             return (
               <div key={key} className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${info.badgeClass}`}>
@@ -949,7 +949,7 @@ function StaffDeskView() {
               <label className="text-[11px] font-bold text-gray-500 block mb-1">เลือกประเภทคิวที่จะเรียก</label>
               <select value={callTypeFilter} onChange={(e) => setCallTypeFilter(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold">
                 <option value="all">ทั้งหมด (เรียงตามลำดับ)</option>
-                {Object.entries(QUEUE_TYPES).filter(([k]) => k !== 'xray').map(([key, info]) => <option key={key} value={key}>{info.label}</option>)}
+                {Object.entries(QUEUE_TYPES).map(([key, info]) => <option key={key} value={key}>{info.label}</option>)}
               </select>
             </div>
           </div>
@@ -1343,7 +1343,7 @@ function MobileQueueView() {
     const currentTimeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setScanTime(currentTimeStr);
     try {
-      const result = await insertQueue({ source: 'mobile', identifier: identifierInput.trim(), queueType: 'xray' });
+      const result = await insertQueue({ source: 'mobile', identifier: identifierInput.trim(), queueType: 'opd' });
       saveIdentifierToStorage(identifierInput.trim());
       saveQueueRefToStorage(result.queue);
       lastStatusRef.current = result.queue.status;

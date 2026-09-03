@@ -48,8 +48,8 @@ export async function insertQueue({ source, identifier, queueType }) {
     }
   }
 
-  // คิวมือถือ (สแกน QR) บังคับเป็น 'xray' เสมอ เหมือนระบบเดิม
-  const finalType = source === 'mobile' ? 'xray' : (queueType || 'xray');
+  // คิวมือถือ (สแกน QR) บังคับเป็น 'opd' เสมอ (คนไข้เดินเข้ามาเองถือเป็นคิว OPD เหมือนออกบัตรกระดาษ)
+  const finalType = source === 'mobile' ? 'opd' : (queueType || 'opd');
 
   const all = await getAllQueues();
   const todaysQueues = all.filter(q => isToday(q.created_at));

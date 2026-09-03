@@ -1,17 +1,18 @@
 export const COUNTERS = [1, 2];
 
-// ประเภทคิว: prefix ใช้สร้างเลขคิว (เช่น X001, W001, U001, E001)
+// ประเภทคิว: prefix ใช้สร้างเลขคิว (เช่น W001, U001, E001)
+// เหลือ 3 ประเภทเท่านั้น: IPD / OPD / ฉุกเฉิน — ตัดประเภท "ทั่วไป (X-Ray)" ออกไปแล้ว
+// คิวที่สแกนจากมือถือ (คนไข้เดินเข้ามาเอง) ถือเป็นคิว OPD เหมือนออกบัตรกระดาษ ใช้ prefix U เหมือนกัน
 export const QUEUE_TYPES = {
-  xray: { label: 'ทั่วไป (X-Ray)', shortLabel: 'ทั่วไป', prefix: 'X', badgeClass: 'bg-emerald-100 text-emerald-700', dotClass: 'bg-emerald-500' },
   ipd: { label: 'ผู้ป่วยใน (IPD)', shortLabel: 'IPD', prefix: 'W', badgeClass: 'bg-purple-100 text-purple-700', dotClass: 'bg-purple-500' },
   opd: { label: 'ผู้ป่วยนอก (OPD)', shortLabel: 'OPD', prefix: 'U', badgeClass: 'bg-blue-100 text-blue-700', dotClass: 'bg-blue-500' },
   emergency: { label: 'ฉุกเฉิน ER', shortLabel: 'ฉุกเฉิน ER', prefix: 'E', badgeClass: 'bg-red-100 text-red-700', dotClass: 'bg-red-500' }
 };
 
-export const getTypeInfo = (type) => QUEUE_TYPES[type] || QUEUE_TYPES.xray;
+export const getTypeInfo = (type) => QUEUE_TYPES[type] || QUEUE_TYPES.opd;
 
 // ใช้อ่านออกเสียงตัวอักษรนำหน้าเลขคิว
-export const PREFIX_READING = { X: 'เอ็กซ์', W: 'ดับเบิลยู', U: 'ยู', E: 'อี' };
+export const PREFIX_READING = { W: 'ดับเบิลยู', U: 'ยู', E: 'อี' };
 
 // สิทธิ์การใช้งานของเจ้าหน้าที่
 export const ROLE_INFO = {

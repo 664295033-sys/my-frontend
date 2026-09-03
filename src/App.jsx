@@ -721,12 +721,18 @@ function LoginView({ onLoggedIn }) {
 
   return (
     <div className="max-w-2xl mx-auto w-full">
-      <div className="bg-white rounded-[28px] shadow-xl shadow-emerald-900/5 border border-emerald-100 overflow-hidden">
-        <div className="flex border-b border-gray-100">
+      <div className="relative bg-white rounded-[28px] shadow-xl shadow-emerald-900/5 border border-emerald-100 overflow-hidden">
+        <img
+          src={HOSPITAL_LOGO_GREEN_SRC}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none select-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] max-w-[65%] max-h-[65%] object-contain opacity-[0.08] z-0"
+        />
+        <div className="relative z-10 flex border-b border-gray-100">
           <button onClick={() => { setMode('login'); setError(''); }} className={`flex-1 py-5 text-base font-bold transition ${mode === 'login' ? 'text-emerald-600 border-b-[3px] border-emerald-500 bg-emerald-50/50' : 'text-gray-400 hover:text-gray-500'}`}>เข้าสู่ระบบ</button>
           <button onClick={() => { setMode('register'); setError(''); }} className={`flex-1 py-5 text-base font-bold transition ${mode === 'register' ? 'text-emerald-600 border-b-[3px] border-emerald-500 bg-emerald-50/50' : 'text-gray-400 hover:text-gray-500'}`}>สมัครสมาชิกเจ้าหน้าที่</button>
         </div>
-        <div className="p-8 sm:p-12 space-y-5">
+        <div className="relative z-10 p-8 sm:p-12 space-y-5">
           {mode === 'login' ? (
             <>
               <div>

@@ -428,7 +428,7 @@ export default function App() {
             src={HOSPITAL_LOGO_GREEN_SRC}
             alt=""
             aria-hidden="true"
-            className="pointer-events-none select-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] max-w-[80vw] max-h-[80vw] object-contain opacity-[0.06] grayscale"
+            className="pointer-events-none select-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[560px] h-[560px] max-w-[85vw] max-h-[85vw] object-contain opacity-20"
           />
           <div className="relative z-10 w-full">
             <LoginView key={loginViewKey} onLoggedIn={(s) => { setStaff(s); saveStaffToStorage(s); setActiveTab(2); }} />

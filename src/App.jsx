@@ -11,7 +11,7 @@ const COUNTERS = [1, 2];
 const STAFF_STORAGE_KEY = 'xray_staff_session';
 
 // โลโก้โรงพยาบาลสงขลา (สีเขียว) — ใช้ที่หน้าจอมือถือคนไข้
-const HOSPITAL_LOGO_GREEN_SRC = "https://cdn.phototourl.com/free/2026-07-14-29a6fb0f-2409-4383-afe8-f6c4c0c39943.jpg";
+const HOSPITAL_LOGO_GREEN_SRC = "https://cdn.phototourl.com/free/2026-09-03-356a616c-a363-4387-9bb9-d77bc7790ec5.jpg";
 
 // ไอคอนฟิล์มเอกซเรย์แบบมินิมอล — ใช้เป็น badge ทับมุมโลโก้ในหน้าจอมือถือคนไข้
 function XRayIcon({ size = 24, className = "" }) {
@@ -428,7 +428,7 @@ export default function App() {
             src={HOSPITAL_LOGO_GREEN_SRC}
             alt=""
             aria-hidden="true"
-            className="pointer-events-none select-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[560px] h-[560px] max-w-[85vw] max-h-[85vw] object-contain opacity-20"
+            className="pointer-events-none select-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] h-[420px] max-w-[70vw] max-h-[70vw] object-contain opacity-[0.15]"
           />
           <div className="relative z-10 w-full">
             <LoginView key={loginViewKey} onLoggedIn={(s) => { setStaff(s); saveStaffToStorage(s); setActiveTab(2); }} />

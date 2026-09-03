@@ -147,3 +147,44 @@ export async function getYearlySummary() {
   if (error) throw error;
   return data;
 }
+
+// ==========================================================
+// ลบข้อมูลคิวออกจากตารางจริง (xray_queues) ตามวัน/เดือน/ปีที่เลือกจากหน้ารายงาน
+// ลบตรงที่ตารางต้นทาง ไม่ใช่ที่ view สรุป เพราะ view คำนวณจากตารางนี้อยู่แล้ว
+// เมื่อลบเสร็จ ให้เรียก getDailySummary/getMonthlySummary/getYearlySummary ใหม่ที่หน้าเว็บ
+// เพื่อให้ตัวเลขที่แสดงตรงกับข้อมูลจริงใน Supabase ทันที
+// ==========================================================
+export async function deleteQueueSummary(type, value) {
+  if (!value) return { ok: false, message: 'กรุณาระบุวัน/เดือน/ปีที่ต้องการลบ' };
+
+  let rangeStart;
+  let rangeEnd;
+
+  if (type === 'day') {
+    // value เช่น '2026-09-03'
+    rangeStart = `${value}T00:00:00`;
+    rangeEnd = `${value}T23:59:59.999`;
+  } else if (type === 'month') {
+    // value เช่น '2026-09'
+    const [y, m] = value.split('-');
+    if (!y || !m) return { ok: false, message: 'รูปแบบเดือนไม่ถูกต้อง' };
+    const lastDay = new Date(Number(y), Number(m), 0).getDate();
+    rangeStart = `${y}-${m}-01T00:00:00`;
+    rangeEnd = `${y}-${m}-${String(lastDay).padStart(2, '0')}T23:59:59.999`;
+  } else if (type === 'year') {
+    // value เช่น '2026'
+    rangeStart = `${value}-01-01T00:00:00`;
+    rangeEnd = `${value}-12-31T23:59:59.999`;
+  } else {
+    return { ok: false, message: 'ประเภทไม่ถูกต้อง' };
+  }
+
+  const { error } = await supabase
+    .from(TABLE)
+    .delete()
+    .gte('created_at', rangeStart)
+    .lte('created_at', rangeEnd);
+
+  if (error) return { ok: false, message: error.message };
+  return { ok: true };
+}

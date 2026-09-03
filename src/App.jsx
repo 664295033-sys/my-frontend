@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRealtimeQueues } from './lib/useRealtimeQueues';
 import { useRealtimeStaff } from './lib/useRealtimeStaff';
-import { insertQueue, callNext, skipQueue, completeQueue, callSkipped, resetAllQueues, getDailySummary, getMonthlySummary, getYearlySummary } from './lib/queueApi';
+import { insertQueue, callNext, skipQueue, completeQueue, callSkipped, resetAllQueues, getDailySummary, getMonthlySummary, getYearlySummary, deleteQueueSummary } from './lib/queueApi';
 import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPassword, changeOwnPassword, updateStaffAvatar, deleteStaff, requestPasswordResetCode, verifyResetCodeAndSetPassword } from './lib/staffApi';
 import { QUEUE_TYPES, getTypeInfo, getSourceLabel, ROLE_INFO, PREFIX_READING } from './lib/constants';
 import { getTodayToken, buildScanUrl } from './lib/Qrtoken';
@@ -1601,6 +1601,12 @@ function ReportTable({ title, rows, dateKey, dateLabel }) {
   );
 }
 
+const DELETE_TYPE_INFO = {
+  day: { label: 'รายวัน', dateKey: 'report_date', dateLabel: 'วันที่' },
+  month: { label: 'รายเดือน', dateKey: 'report_month', dateLabel: 'เดือน' },
+  year: { label: 'รายปี', dateKey: 'report_year', dateLabel: 'ปี' },
+};
+
 function ReportView() {
   const [daily, setDaily] = useState([]);
   const [monthly, setMonthly] = useState([]);
@@ -1611,21 +1617,61 @@ function ReportView() {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const [d, m, y] = await Promise.all([getDailySummary(), getMonthlySummary(), getYearlySummary()]);
-        setDaily(d);
-        setMonthly(m);
-        setYearly(y);
-      } catch (err) {
-        setError('โหลดรายงานไม่สำเร็จ: ' + err.message + ' (ต้องรัน SQL สร้าง view daily_queue_summary / monthly_queue_summary / yearly_queue_summary ใน Supabase ก่อน)');
+  // ปุ่มถังขยะ — ลบข้อมูลคิวตามวัน/เดือน/ปีที่เลือก แล้วรีเฟรชสรุปรายงานให้ตรงกับ Supabase ทันที
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteType, setDeleteType] = useState('day');
+  const [deleteValue, setDeleteValue] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const fetchSummaries = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [d, m, y] = await Promise.all([getDailySummary(), getMonthlySummary(), getYearlySummary()]);
+      setDaily(d);
+      setMonthly(m);
+      setYearly(y);
+    } catch (err) {
+      setError('โหลดรายงานไม่สำเร็จ: ' + err.message + ' (ต้องรัน SQL สร้าง view daily_queue_summary / monthly_queue_summary / yearly_queue_summary ใน Supabase ก่อน)');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchSummaries(); }, []);
+
+  const openDeleteModal = () => {
+    setDeleteType('day');
+    setDeleteValue('');
+    setDeleteError('');
+    setShowDeleteModal(true);
+  };
+
+  const rowsForDeleteType = deleteType === 'day' ? daily : deleteType === 'month' ? monthly : yearly;
+  const deleteDateKey = DELETE_TYPE_INFO[deleteType].dateKey;
+
+  const handleConfirmDelete = async () => {
+    if (!deleteValue) {
+      setDeleteError('กรุณาเลือกวัน/เดือน/ปีที่ต้องการลบ');
+      return;
+    }
+    const typeLabel = DELETE_TYPE_INFO[deleteType].label;
+    if (!window.confirm(`ต้องการลบข้อมูลคิว${typeLabel} "${deleteValue}" ทิ้งถาวรใช่หรือไม่? ข้อมูลใน Supabase จะถูกลบและกู้คืนไม่ได้`)) return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const result = await deleteQueueSummary(deleteType, deleteValue);
+      if (result.ok) {
+        setShowDeleteModal(false);
+        await fetchSummaries();
+      } else {
+        setDeleteError(result.message || 'ลบข้อมูลไม่สำเร็จ');
       }
-      setLoading(false);
-    })();
-  }, []);
+    } catch (err) {
+      setDeleteError('เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + err.message);
+    }
+    setDeleting(false);
+  };
 
   const handleExportExcel = async () => {
     setExporting(true);
@@ -1672,6 +1718,13 @@ function ReportView() {
             >
               {syncing ? 'กำลังส่งข้อมูล...' : '📤 ส่งไป Google Sheet'}
             </button>
+            <button
+              onClick={openDeleteModal}
+              title="ลบข้อมูลคิวตามวัน/เดือน/ปี"
+              className="bg-red-50 hover:bg-red-100 text-red-600 font-bold p-2.5 rounded-lg border border-red-200 flex items-center justify-center"
+            >
+              <TrashIcon size={16} />
+            </button>
           </div>
         )}
       </div>
@@ -1687,6 +1740,59 @@ function ReportView() {
           </>
         )}
       </div>
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !deleting && setShowDeleteModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-bold text-gray-800 text-sm flex items-center gap-1.5"><TrashIcon size={14} className="text-red-500" /> ลบข้อมูลคิว</h4>
+              <button onClick={() => setShowDeleteModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1.5">เลือกประเภทที่จะลบ</label>
+                <div className="flex bg-gray-100 p-1 rounded-lg">
+                  {Object.entries(DELETE_TYPE_INFO).map(([key, info]) => (
+                    <button
+                      key={key}
+                      onClick={() => { setDeleteType(key); setDeleteValue(''); setDeleteError(''); }}
+                      className={`flex-1 py-1.5 rounded-md text-xs font-bold transition ${deleteType === key ? 'bg-white shadow-sm text-emerald-600' : 'text-gray-500'}`}
+                    >
+                      {info.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1.5">เลือก{DELETE_TYPE_INFO[deleteType].dateLabel}ที่จะลบ</label>
+                <select
+                  value={deleteValue}
+                  onChange={(e) => { setDeleteValue(e.target.value); setDeleteError(''); }}
+                  className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-semibold"
+                >
+                  <option value="">-- เลือก{DELETE_TYPE_INFO[deleteType].dateLabel} --</option>
+                  {rowsForDeleteType.map((row) => (
+                    <option key={row[deleteDateKey]} value={row[deleteDateKey]}>
+                      {row[deleteDateKey]} (รวม {row.total_count || 0} คิว)
+                    </option>
+                  ))}
+                </select>
+                {rowsForDeleteType.length === 0 && (
+                  <p className="text-gray-400 text-xs italic mt-1.5">ยังไม่มีข้อมูล{DELETE_TYPE_INFO[deleteType].label}ให้ลบ</p>
+                )}
+              </div>
+              {deleteError && <p className="text-red-500 text-xs font-bold text-center">{deleteError}</p>}
+              <button
+                onClick={handleConfirmDelete}
+                disabled={deleting || !deleteValue}
+                className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl text-sm"
+              >
+                {deleting ? 'กำลังลบข้อมูล...' : 'ยืนยันลบข้อมูลถาวร'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

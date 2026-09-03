@@ -11,7 +11,7 @@ const COUNTERS = [1, 2];
 const STAFF_STORAGE_KEY = 'xray_staff_session';
 
 // โลโก้โรงพยาบาลสงขลา (สีเขียว) — ใช้ที่หน้าจอมือถือคนไข้
-const HOSPITAL_LOGO_GREEN_SRC = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxISEBUSEhIVFhUXEQ8QEBAQEQ8WFhUYFREWFhURFRUYHSggGBolGxUVITEhJSkrLi4uFx8zODMsNygtLisBCgoKDg0OGBAQGi0dHR4rLS0rLS0rKy0tLS0tLSstLS0tLS0tLS0tLS0tLS0tLS0tNzctNy03Ky0tLTctLS03N//AABEIAVEBUQMBIgACEQEDEQH/xAAcAAEAAQUBAQAAAAAAAAAAAAAABgEDBAUHAgj/xABOEAACAgECAwQFBwgHBQYHAAABAgADBBESBSExBhMiQTJCUWFxBxRScoGRoSMzYoKSscHRJENTc7LC8BUWouHxJTQ1RLPSF1RjdIOjw//EABkBAQEBAQEBAAAAAAAAAAAAAAABAgMFBP/EACYRAQACAQQDAAICAwEAAAAAAAABAhEDEiExBBNBIlFhgRRxkSP/2gAMAwEAAhEDEQA/AO4xEQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBEpArEprEBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQKRLdtoXqdOfL3zCy8sIhexxUgGpZm0P6x6LCTMRzLLe4DqefkB1P2Tz3rHoNB7WPP7pG045dd4cHHJU9crJ3JX9YA+OyXB2Zst55mVbb7aqi1NP7KHUj4mGN+eoZfEOPY1PK7KQH6AZQT9i6mYQ7T0t+ax8q8fSTHtZfvfQTPqwcPDRnWuqpVGrOFUED2k9es94fHsa2lrq7Vatd29h6pXnoR16QzM2ziZw1o4zYfR4Xf+t80T97yp4xb63C7tPapxG/DfNdxLtvZ3LXY+Ha6gBhZZtVSv09gJfaR7puMjtTTXi1ZDHf3oQVilWJdm9VF6yZZi8TM/ksf7yVr6eJlVDzb5tZtH61WsyMPtHh2HRMoA/QdtrE/C0bp74F2jqyWesLZXZXp3lNybHUN0bT2dIzMnAvc02Nj2OBoa3NTN+MqxacZizaI78jyYe1Tp/P989JeDy10P0W5GaBuyi1+LEuuxz5Kjb6v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qvqYVt4dLb6T6i67vukhsxuL0gWi2rLBAd6WRUKnr+SZevum67M4NOhyfmnze2zU2K48YPn8Afd1mccuGyb3z02fC+G1Y9eypAq67iPESSerEnrOafKN2zLs2JjsQgJW+0H0iORrU+zXqZJPlL7RnFx+6qOltoZVI6qunNvd7BOS8W4Y+Oyg67XRLqn05Mrru5e8SzLl5WtNY2U/tgCIiYeSSspL+FitbalSek7oi6+1m0hYibYiEk7J8DN+PkuwJG2kKgHi073x3p8ALOXmdZte3fAj3hsA249GHQtTLz18TIi/f1934z/AIJwWvGSpV59zUai59Jy7B2Hw156e+Z2VQrp3bqCpW02KRy2FW8P4ib2vWr4sTp4fOcpJP2/4IuLlKtY0R6amRfolfA37l/akYmHl3pNLbZIiIYTXsD2yOKwpuYnHJ5Mefcn6X1Nevs6zswII19vMaGfNeFjPbYtda7mZgFAHPX6Xu0nTOx/F7Wqv4YLF7+oWJjWNzBVW2beXs/c3umol6fi6842W/pp+1+CuNdbbYare+OStR3M7sXXkpHSoVbtQRzm47HcNtvyVydbqqqsemhbG8BySnrOhHMeIjX9ESQdn+zAxcfS4LfYp7xQEUIrKm0d0vqk6c26k8zIxxfjWXmYws+ZN3Pe7kVLNS4RmDV3INCBqv2FRHTtNIpO6f8AiVdp6zj2156ep+SyQBrupdvS/UYhvvkipYa8jyYb1IP3/wAPvka7H2rdhfNrrFttWvu8hA28qr7tqOfq/ul7sncwoaiw62YtrUMT6yL6DfbWRLD6KWjPH1KAZWUErK7EREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERAREQEREBERA/9k=";
+const HOSPITAL_LOGO_GREEN_SRC = "https://cdn.phototourl.com/free/2026-09-03-12722a13-ae77-4daa-87f1-85cd8fe06ed3.jpg";
 
 // ==========================================================
 // พื้นหลังหน้าจอเข้าสู่ระบบเจ้าหน้าที่ — ใช้รูปภาพที่กำหนดเอง (custom URL)
@@ -429,20 +429,20 @@ export default function App() {
           </div>
         </header>
         <main className="flex-1 flex items-center justify-center px-4 py-10">
-          <div className="relative max-w-2xl w-full mx-auto">
+          <div className="relative max-w-3xl w-full mx-auto p-6 sm:p-10 rounded-[36px] overflow-hidden shadow-2xl">
             <img
               src={STAFF_LOGIN_BG_SRC}
               alt=""
               aria-hidden="true"
-              className="pointer-events-none select-none absolute inset-0 w-full h-full object-cover rounded-[28px]"
+              className="pointer-events-none select-none absolute inset-0 w-full h-full object-cover"
             />
-            <div className="pointer-events-none select-none absolute inset-0 bg-white/35 rounded-[28px]" aria-hidden="true"></div>
+            <div className="pointer-events-none select-none absolute inset-0 bg-black/10" aria-hidden="true"></div>
             <img
               src={HOSPITAL_LOGO_GREEN_SRC}
               alt="โลโก้โรงพยาบาลสงขลา"
-              className="absolute -top-5 -left-5 z-20 w-16 h-16 rounded-full object-contain bg-white border-2 border-emerald-100 shadow-lg p-1"
+              className="absolute top-3 left-3 z-20 w-16 h-16 rounded-full object-cover bg-white border-2 border-emerald-100 shadow-lg p-1"
             />
-            <div className="relative z-10">
+            <div className="relative z-10 max-w-2xl mx-auto">
               <LoginView key={loginViewKey} onLoggedIn={(s) => { setStaff(s); saveStaffToStorage(s); setActiveTab(2); }} />
             </div>
           </div>
@@ -734,7 +734,7 @@ function LoginView({ onLoggedIn }) {
 
   return (
     <div className="max-w-2xl mx-auto w-full">
-      <div className="relative bg-white/95 backdrop-blur-sm rounded-[28px] shadow-2xl shadow-black/20 border border-emerald-100 overflow-hidden">
+      <div className="relative bg-white/80 backdrop-blur-md rounded-[28px] shadow-2xl shadow-black/20 border border-emerald-100 overflow-hidden">
         <div className="relative z-10 flex border-b border-gray-100">
           <button onClick={() => { setMode('login'); setError(''); }} className={`flex-1 py-5 text-base font-bold transition ${mode === 'login' ? 'text-emerald-600 border-b-[3px] border-emerald-500 bg-emerald-50/50' : 'text-gray-400 hover:text-gray-500'}`}>เข้าสู่ระบบ</button>
           <button onClick={() => { setMode('register'); setError(''); }} className={`flex-1 py-5 text-base font-bold transition ${mode === 'register' ? 'text-emerald-600 border-b-[3px] border-emerald-500 bg-emerald-50/50' : 'text-gray-400 hover:text-gray-500'}`}>สมัครสมาชิกเจ้าหน้าที่</button>

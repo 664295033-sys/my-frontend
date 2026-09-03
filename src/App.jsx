@@ -428,16 +428,18 @@ export default function App() {
             <h1 className="text-2xl font-bold tracking-tight text-emerald-600">Queue<span className="text-gray-800">System</span></h1>
           </div>
         </header>
-        <main className="flex-1 flex items-center justify-center px-4 py-10 relative overflow-hidden">
-          <img
-            src={STAFF_LOGIN_BG_SRC}
-            alt=""
-            aria-hidden="true"
-            className="pointer-events-none select-none absolute inset-0 w-full h-full object-cover opacity-100"
-          />
-          <div className="pointer-events-none select-none absolute inset-0 bg-white/10" aria-hidden="true"></div>
-          <div className="relative z-10 w-full">
-            <LoginView key={loginViewKey} onLoggedIn={(s) => { setStaff(s); saveStaffToStorage(s); setActiveTab(2); }} />
+        <main className="flex-1 flex items-center justify-center px-4 py-10">
+          <div className="relative max-w-2xl w-full mx-auto">
+            <img
+              src={STAFF_LOGIN_BG_SRC}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none select-none absolute inset-0 w-full h-full object-cover rounded-[28px]"
+            />
+            <div className="pointer-events-none select-none absolute inset-0 bg-white/10 rounded-[28px]" aria-hidden="true"></div>
+            <div className="relative z-10">
+              <LoginView key={loginViewKey} onLoggedIn={(s) => { setStaff(s); saveStaffToStorage(s); setActiveTab(2); }} />
+            </div>
           </div>
         </main>
       </div>

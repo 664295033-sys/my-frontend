@@ -429,20 +429,20 @@ export default function App() {
           </div>
         </header>
         <main className="flex-1 flex items-center justify-center px-4 py-10">
-          <div className="relative max-w-3xl w-full mx-auto p-6 sm:p-10 rounded-[36px] overflow-hidden shadow-2xl">
+          <div className="relative max-w-xl w-full mx-auto p-4 sm:p-6 rounded-[32px] overflow-hidden shadow-2xl">
             <img
               src={STAFF_LOGIN_BG_SRC}
               alt=""
               aria-hidden="true"
               className="pointer-events-none select-none absolute inset-0 w-full h-full object-cover"
             />
-            <div className="pointer-events-none select-none absolute inset-0 bg-black/10" aria-hidden="true"></div>
+            <div className="pointer-events-none select-none absolute inset-0 bg-black/30" aria-hidden="true"></div>
             <img
               src={HOSPITAL_LOGO_GREEN_SRC}
               alt="โลโก้โรงพยาบาลสงขลา"
-              className="absolute top-3 left-3 z-20 w-16 h-16 rounded-full object-cover bg-white border-2 border-emerald-100 shadow-lg p-1"
+              className="absolute top-3 left-3 z-20 w-14 h-14 rounded-full object-cover bg-white border-2 border-emerald-100 shadow-lg p-1"
             />
-            <div className="relative z-10 max-w-2xl mx-auto">
+            <div className="relative z-10 max-w-md mx-auto">
               <LoginView key={loginViewKey} onLoggedIn={(s) => { setStaff(s); saveStaffToStorage(s); setActiveTab(2); }} />
             </div>
           </div>
@@ -733,41 +733,41 @@ function LoginView({ onLoggedIn }) {
   };
 
   return (
-    <div className="max-w-2xl mx-auto w-full">
-      <div className="relative bg-white/80 backdrop-blur-md rounded-[28px] shadow-2xl shadow-black/20 border border-emerald-100 overflow-hidden">
-        <div className="relative z-10 flex border-b border-gray-100">
-          <button onClick={() => { setMode('login'); setError(''); }} className={`flex-1 py-5 text-base font-bold transition ${mode === 'login' ? 'text-emerald-600 border-b-[3px] border-emerald-500 bg-emerald-50/50' : 'text-gray-400 hover:text-gray-500'}`}>เข้าสู่ระบบ</button>
-          <button onClick={() => { setMode('register'); setError(''); }} className={`flex-1 py-5 text-base font-bold transition ${mode === 'register' ? 'text-emerald-600 border-b-[3px] border-emerald-500 bg-emerald-50/50' : 'text-gray-400 hover:text-gray-500'}`}>สมัครสมาชิกเจ้าหน้าที่</button>
+    <div className="max-w-md mx-auto w-full">
+      <div className="relative bg-white rounded-[24px] shadow-2xl shadow-black/30 border border-white/40 overflow-hidden max-h-[85vh] flex flex-col">
+        <div className="relative z-10 flex border-b border-gray-100 shrink-0">
+          <button onClick={() => { setMode('login'); setError(''); }} className={`flex-1 py-3.5 text-sm font-bold transition ${mode === 'login' ? 'text-emerald-600 border-b-[3px] border-emerald-500 bg-emerald-50/50' : 'text-gray-400 hover:text-gray-500'}`}>เข้าสู่ระบบ</button>
+          <button onClick={() => { setMode('register'); setError(''); }} className={`flex-1 py-3.5 text-sm font-bold transition ${mode === 'register' ? 'text-emerald-600 border-b-[3px] border-emerald-500 bg-emerald-50/50' : 'text-gray-400 hover:text-gray-500'}`}>สมัครสมาชิกเจ้าหน้าที่</button>
         </div>
-        <div className="relative z-10 p-8 sm:p-12 space-y-5">
+        <div className="relative z-10 p-5 sm:p-6 space-y-3 overflow-y-auto">
           {mode === 'login' ? (
             <>
               <div>
-                <label className="text-sm font-bold text-gray-600 block mb-2">บัญชีผู้ใช้งาน (Username)</label>
-                <input type="text" value={loginForm.username} onChange={(e) => setLoginForm(f => ({ ...f, username: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-2xl px-5 py-3.5 text-[15px] transition" />
+                <label className="text-xs font-bold text-gray-600 block mb-1.5">บัญชีผู้ใช้งาน (Username)</label>
+                <input type="text" value={loginForm.username} onChange={(e) => setLoginForm(f => ({ ...f, username: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
               </div>
               <div>
-                <label className="text-sm font-bold text-gray-600 block mb-2">รหัสผ่าน</label>
-                <input type="password" value={loginForm.password} onChange={(e) => setLoginForm(f => ({ ...f, password: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') handleLogin(); }} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-2xl px-5 py-3.5 text-[15px] transition" />
+                <label className="text-xs font-bold text-gray-600 block mb-1.5">รหัสผ่าน</label>
+                <input type="password" value={loginForm.password} onChange={(e) => setLoginForm(f => ({ ...f, password: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') handleLogin(); }} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
               </div>
               {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
-              <button onClick={handleLogin} disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-4 rounded-2xl text-[15px] shadow-lg shadow-emerald-600/20 transition">
+              <button onClick={handleLogin} disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl text-sm shadow-lg shadow-emerald-600/20 transition">
                 {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
               </button>
-              <button type="button" onClick={openForgotModal} className="w-full text-center text-sm font-bold text-emerald-600 hover:underline">
+              <button type="button" onClick={openForgotModal} className="w-full text-center text-xs font-bold text-emerald-600 hover:underline">
                 ลืมรหัสผ่าน?
               </button>
             </>
           ) : (
             <>
-              <input type="text" placeholder="ชื่อ-นามสกุล" value={registerForm.fullName} onChange={(e) => setRegisterForm(f => ({ ...f, fullName: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-2xl px-5 py-3.5 text-[15px] transition" />
-              <input type="text" placeholder="ตำแหน่งงาน" value={registerForm.position} onChange={(e) => setRegisterForm(f => ({ ...f, position: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-2xl px-5 py-3.5 text-[15px] transition" />
-              <input type="text" placeholder="ชื่อบัญชีผู้ใช้" value={registerForm.username} onChange={(e) => setRegisterForm(f => ({ ...f, username: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-2xl px-5 py-3.5 text-[15px] transition" />
-              <input type="email" placeholder="อีเมล" value={registerForm.email} onChange={(e) => setRegisterForm(f => ({ ...f, email: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-2xl px-5 py-3.5 text-[15px] transition" />
-              <input type="password" placeholder="รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)" value={registerForm.password} onChange={(e) => setRegisterForm(f => ({ ...f, password: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-2xl px-5 py-3.5 text-[15px] transition" />
-              <input type="text" placeholder="รหัสเชิญเข้าร่วมทีมงาน" value={registerForm.inviteCode} onChange={(e) => setRegisterForm(f => ({ ...f, inviteCode: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-2xl px-5 py-3.5 text-[15px] transition" />
+              <input type="text" placeholder="ชื่อ-นามสกุล" value={registerForm.fullName} onChange={(e) => setRegisterForm(f => ({ ...f, fullName: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
+              <input type="text" placeholder="ตำแหน่งงาน" value={registerForm.position} onChange={(e) => setRegisterForm(f => ({ ...f, position: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
+              <input type="text" placeholder="ชื่อบัญชีผู้ใช้" value={registerForm.username} onChange={(e) => setRegisterForm(f => ({ ...f, username: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
+              <input type="email" placeholder="อีเมล" value={registerForm.email} onChange={(e) => setRegisterForm(f => ({ ...f, email: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
+              <input type="password" placeholder="รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)" value={registerForm.password} onChange={(e) => setRegisterForm(f => ({ ...f, password: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
+              <input type="text" placeholder="รหัสเชิญเข้าร่วมทีมงาน" value={registerForm.inviteCode} onChange={(e) => setRegisterForm(f => ({ ...f, inviteCode: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
               {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
-              <button onClick={handleRegister} disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-4 rounded-2xl text-[15px] shadow-lg shadow-emerald-600/20 transition">
+              <button onClick={handleRegister} disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl text-sm shadow-lg shadow-emerald-600/20 transition">
                 {loading ? 'กำลังลงทะเบียน...' : 'ลงทะเบียน'}
               </button>
             </>

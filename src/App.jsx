@@ -50,6 +50,16 @@ function TrashIcon({ size = 14, className = "" }) {
   );
 }
 
+// ไอคอนรีเฟรช — ใช้กับปุ่มโหลดข้อมูลรายงานใหม่
+function RefreshIcon({ size = 14, className = "" }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+      <polyline points="21 3 21 9 15 9" />
+    </svg>
+  );
+}
+
 function getStoredStaff() {
   try {
     const raw = localStorage.getItem(STAFF_STORAGE_KEY);
@@ -1781,26 +1791,31 @@ function ReportView() {
   const [monthly, setMonthly] = useState([]);
   const [yearly, setYearly] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [exporting, setExporting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  // โหลดข้อมูลรายงานจาก Supabase — ใช้ร่วมกันทั้งตอนเปิดหน้าครั้งแรกและตอนกดปุ่มรีเฟรช
+  const fetchData = async ({ isInitial } = {}) => {
+    if (isInitial) setLoading(true); else setRefreshing(true);
+    setError('');
+    try {
+      const [d, m, y] = await Promise.all([getDailySummary(), getMonthlySummary(), getYearlySummary()]);
+      setDaily(d);
+      setMonthly(m);
+      setYearly(y);
+    } catch (err) {
+      setError('โหลดรายงานไม่สำเร็จ: ' + err.message + ' (ต้องรัน SQL สร้าง view daily_queue_summary / monthly_queue_summary / yearly_queue_summary ใน Supabase ก่อน)');
+    }
+    if (isInitial) setLoading(false); else setRefreshing(false);
+  };
+
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const [d, m, y] = await Promise.all([getDailySummary(), getMonthlySummary(), getYearlySummary()]);
-        setDaily(d);
-        setMonthly(m);
-        setYearly(y);
-      } catch (err) {
-        setError('โหลดรายงานไม่สำเร็จ: ' + err.message + ' (ต้องรัน SQL สร้าง view daily_queue_summary / monthly_queue_summary / yearly_queue_summary ใน Supabase ก่อน)');
-      }
-      setLoading(false);
-    })();
+    fetchData({ isInitial: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleExportExcel = async () => {
@@ -1843,31 +1858,42 @@ function ReportView() {
     <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 max-h-[75vh] overflow-y-auto">
       <div className="flex flex-wrap items-center justify-between gap-3 sticky top-0 bg-white z-10 px-6 py-4 border-b border-gray-100 rounded-t-2xl">
         <h3 className="text-lg font-bold text-gray-800">รายงานสรุปคิวแยกตามประเภท โรงพยาบาลสงขลา</h3>
-        {!error && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleExportExcel}
-              disabled={exporting}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold px-4 py-2 rounded-lg text-sm"
-            >
-              {exporting ? 'กำลังสร้างไฟล์...' : '📥 ดาวน์โหลด Excel'}
-            </button>
-            <button
-              onClick={handleSyncGoogleSheet}
-              disabled={syncing}
-              className="bg-blue-50 hover:bg-blue-100 disabled:opacity-60 text-blue-700 font-bold px-4 py-2 rounded-lg text-sm border border-blue-200"
-            >
-              {syncing ? 'กำลังส่งข้อมูล...' : '📤 ส่งไป Google Sheet'}
-            </button>
-            <button
-              onClick={() => setShowDeleteModal(true)}
-              title="ลบข้อมูลสรุปคิวตามวัน/เดือน/ปี"
-              className="bg-red-50 hover:bg-red-100 text-red-600 font-bold p-2.5 rounded-lg border border-red-200 flex items-center justify-center"
-            >
-              <TrashIcon size={16} />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => fetchData({ isInitial: false })}
+            disabled={refreshing}
+            title="รีเฟรชข้อมูลล่าสุดจากฐานข้อมูล"
+            className="bg-gray-100 hover:bg-gray-200 disabled:opacity-60 text-gray-700 font-bold px-3 py-2 rounded-lg text-sm flex items-center gap-1.5"
+          >
+            <RefreshIcon size={14} className={refreshing ? 'animate-spin' : ''} />
+            {refreshing ? 'กำลังรีเฟรช...' : 'รีเฟรช'}
+          </button>
+          {!error && (
+            <>
+              <button
+                onClick={handleExportExcel}
+                disabled={exporting}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold px-4 py-2 rounded-lg text-sm"
+              >
+                {exporting ? 'กำลังสร้างไฟล์...' : '📥 ดาวน์โหลด Excel'}
+              </button>
+              <button
+                onClick={handleSyncGoogleSheet}
+                disabled={syncing}
+                className="bg-blue-50 hover:bg-blue-100 disabled:opacity-60 text-blue-700 font-bold px-4 py-2 rounded-lg text-sm border border-blue-200"
+              >
+                {syncing ? 'กำลังส่งข้อมูล...' : '📤 ส่งไป Google Sheet'}
+              </button>
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                title="ลบข้อมูลสรุปคิวตามวัน/เดือน/ปี"
+                className="bg-red-50 hover:bg-red-100 text-red-600 font-bold p-2.5 rounded-lg border border-red-200 flex items-center justify-center"
+              >
+                <TrashIcon size={16} />
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <div className="px-6 py-6">
         {syncMsg && <p className="text-xs font-semibold text-emerald-600 mb-3">{syncMsg}</p>}

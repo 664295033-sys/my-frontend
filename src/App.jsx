@@ -1705,9 +1705,11 @@ function DeleteSummaryModal({ daily, monthly, yearly, onClose, onDeleted }) {
   const [busyKey, setBusyKey] = useState(null);
 
   const TAB_CONFIG = {
-    daily: { label: 'รายวัน', rows: daily, dateKey: 'report_date', type: 'daily' },
-    monthly: { label: 'รายเดือน', rows: monthly, dateKey: 'report_month', type: 'monthly' },
-    yearly: { label: 'รายปี', rows: yearly, dateKey: 'report_year', type: 'yearly' },
+    // apiType ใช้ส่งให้ deleteQueueSummary ใน queueApi.js (รับแค่ 'day' | 'month' | 'year')
+    // stateType ใช้บอก ReportView ว่าต้องไปลบแถวออกจาก state ก้อนไหน ('daily' | 'monthly' | 'yearly')
+    daily: { label: 'รายวัน', rows: daily, dateKey: 'report_date', apiType: 'day', stateType: 'daily' },
+    monthly: { label: 'รายเดือน', rows: monthly, dateKey: 'report_month', apiType: 'month', stateType: 'monthly' },
+    yearly: { label: 'รายปี', rows: yearly, dateKey: 'report_year', apiType: 'year', stateType: 'yearly' },
   };
   const current = TAB_CONFIG[tab];
 
@@ -1715,9 +1717,9 @@ function DeleteSummaryModal({ daily, monthly, yearly, onClose, onDeleted }) {
     if (!window.confirm(`ต้องการลบข้อมูลสรุปคิว "${dateValue}" (${current.label}) ทิ้งถาวรใช่หรือไม่? ข้อมูลจะถูกลบออกจากฐานข้อมูลจริง`)) return;
     setBusyKey(dateValue);
     try {
-      const result = await deleteQueueSummary(current.type, dateValue);
+      const result = await deleteQueueSummary(current.apiType, dateValue);
       if (result && result.ok === false) throw new Error(result.message || 'ลบไม่สำเร็จ');
-      onDeleted(current.type, dateValue);
+      onDeleted(current.stateType, dateValue);
     } catch (err) {
       alert(err.message || 'ลบข้อมูลไม่สำเร็จ');
     }

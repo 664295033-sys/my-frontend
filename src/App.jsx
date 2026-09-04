@@ -1656,8 +1656,8 @@ function ReportView() {
   if (loading) return <p className="text-gray-400 text-center py-10">กำลังโหลดรายงาน...</p>;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6 border border-emerald-100">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 max-h-[75vh] overflow-y-auto">
+      <div className="flex flex-wrap items-center justify-between gap-3 sticky top-0 bg-white z-10 px-6 py-4 border-b border-gray-100 rounded-t-2xl">
         <h3 className="text-lg font-bold text-gray-800">รายงานสรุปคิวแยกตามประเภท โรงพยาบาลสงขลา</h3>
         {!error && (
           <div className="flex items-center gap-2">
@@ -1678,16 +1678,18 @@ function ReportView() {
           </div>
         )}
       </div>
-      {syncMsg && <p className="text-xs font-semibold text-emerald-600 mb-3">{syncMsg}</p>}
-      {error ? (
-        <p className="text-red-500 text-sm font-semibold">{error}</p>
-      ) : (
-        <>
-          <ReportTable title="สรุปคิวแยกตามประเภท รายวัน" rows={daily} dateKey="report_date" dateLabel="วันที่" />
-          <ReportTable title="สรุปคิวแยกตามประเภท รายเดือน" rows={monthly} dateKey="report_month" dateLabel="เดือน" />
-          <ReportTable title="สรุปคิวแยกตามประเภท รายปี" rows={yearly} dateKey="report_year" dateLabel="ปี" />
-        </>
-      )}
+      <div className="px-6 py-6">
+        {syncMsg && <p className="text-xs font-semibold text-emerald-600 mb-3">{syncMsg}</p>}
+        {error ? (
+          <p className="text-red-500 text-sm font-semibold">{error}</p>
+        ) : (
+          <>
+            <ReportTable title="สรุปคิวแยกตามประเภท รายวัน" rows={daily} dateKey="report_date" dateLabel="วันที่" />
+            <ReportTable title="สรุปคิวแยกตามประเภท รายเดือน" rows={monthly} dateKey="report_month" dateLabel="เดือน" />
+            <ReportTable title="สรุปคิวแยกตามประเภท รายปี" rows={yearly} dateKey="report_year" dateLabel="ปี" />
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -30,7 +30,7 @@ function XRayIcon({ size = 24, className = "" }) {
       <rect x="2.5" y="3" width="19" height="18" rx="2.2" />
       <path d="M8 6.5c1.4 1 1.4 2.5 0 3.5s-1.4 2.5 0 3.5 1.4 2.5 0 3.8" />
       <path d="M12 5.5c1.4 1.1 1.4 2.7 0 3.8s-1.4 2.7 0 3.8 1.4 2.7 0 4.4" />
-      <path d="M16 6.5c1.4 1 1.4 2.5 0 3.5s-1.4 2.5 0 3.5 1.4 2.5 0 3.8" />
+      <path d="M16 6.5c1.4 1 1.4 2. 5 0 3.5s-1.4 2.5 0 3.5 1.4 2.5 0 3.8" />
       <circle cx="8" cy="6.2" r="0.9" fill="currentColor" stroke="none" />
       <circle cx="12" cy="5.2" r="0.9" fill="currentColor" stroke="none" />
       <circle cx="16" cy="6.2" r="0.9" fill="currentColor" stroke="none" />

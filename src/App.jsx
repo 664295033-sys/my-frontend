@@ -30,7 +30,7 @@ function XRayIcon({ size = 24, className = "" }) {
       <rect x="2.5" y="3" width="19" height="18" rx="2.2" />
       <path d="M8 6.5c1.4 1 1.4 2.5 0 3.5s-1.4 2.5 0 3.5 1.4 2.5 0 3.8" />
       <path d="M12 5.5c1.4 1.1 1.4 2.7 0 3.8s-1.4 2.7 0 3.8 1.4 2.7 0 4.4" />
-      <path d="M16 6.5c1.4 1 1.4 2. 5 0 3.5s-1.4 2.5 0 3.5 1.4 2.5 0 3.8" />
+      <path d="M16 6.5c1.4 1 1.4 2.5 0 3.5s-1.4 2.5 0 3.5 1.4 2.5 0 3.8" />
       <circle cx="8" cy="6.2" r="0.9" fill="currentColor" stroke="none" />
       <circle cx="12" cy="5.2" r="0.9" fill="currentColor" stroke="none" />
       <circle cx="16" cy="6.2" r="0.9" fill="currentColor" stroke="none" />
@@ -327,6 +327,46 @@ export default function App() {
   useEffect(() => {
     const stored = getStoredStaff();
     if (stored) setStaff(stored);
+  }, []);
+
+  // ==========================================================
+  // ปิดการเลือก/คัดลอกข้อความทั้งเว็บ + ปิดเมนูคลิกขวา ให้ดูเป็นมืออาชีพ
+  // (ยังคงพิมพ์/แก้ไขได้ปกติใน input, textarea และช่องที่ใส่ class "selectable")
+  // ==========================================================
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.setAttribute('data-no-select', 'true');
+    style.innerHTML = `
+      *, *::before, *::after {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+      input, textarea, [contenteditable="true"], .selectable, .selectable * {
+        -webkit-user-select: text;
+        -moz-user-select: text;
+        -ms-user-select: text;
+        user-select: text;
+        -webkit-touch-callout: default;
+      }
+    `;
+    document.head.appendChild(style);
+
+    const handleContextMenu = (e) => {
+      const target = e.target;
+      // อนุญาตคลิกขวาปกติเฉพาะในช่องกรอกข้อมูล กันไม่ให้เจ้าหน้าที่แก้ไขข้อความในช่องกรอกลำบาก
+      const tag = target.tagName ? target.tagName.toLowerCase() : '';
+      if (tag === 'input' || tag === 'textarea' || target.isContentEditable) return;
+      e.preventDefault();
+    };
+    document.addEventListener('contextmenu', handleContextMenu);
+
+    return () => {
+      document.head.removeChild(style);
+      document.removeEventListener('contextmenu', handleContextMenu);
+    };
   }, []);
 
   // ปิดเมนูโปรไฟล์เมื่อคลิกนอกกล่องเมนู

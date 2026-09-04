@@ -33,7 +33,7 @@ function XRayIcon({ size = 24, className = "" }) {
   );
 }
 
-// ไอคอนถังขยะ — ใช้กับปุ่มลบบัญชีเจ้าหน้าที่ในหน้าจัดการสิทธิ์
+// ไอคอนถังขยะ — ใช้กับปุ่มลบบัญชีเจ้าหน้าที่ในหน้าจัดการสิทธิ์ และปุ่มลบรายงานสรุปคิว
 function TrashIcon({ size = 14, className = "" }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -1593,9 +1593,6 @@ function MobileQueueView() {
 }
 
 // ==========================================================
-// หน้าจัดการสิทธิ์เจ้าหน้าที่ (realtime)
-// ==========================================================
-// ==========================================================
 // รายงานสรุปคิวแยกตามประเภท — รายวัน/รายเดือน/รายปี (หน้าตาตามชีทสรุปคิว)
 // ==========================================================
 const REPORT_TYPE_COLS = [
@@ -1635,6 +1632,83 @@ function ReportTable({ title, rows, dateKey, dateLabel }) {
   );
 }
 
+// ==========================================================
+// Modal เลือกวัน/เดือน/ปี ที่จะลบข้อมูลสรุปคิว — ลบจริงใน Supabase ผ่าน deleteQueueSummary
+// ==========================================================
+function DeleteSummaryModal({ daily, monthly, yearly, onClose, onDeleted }) {
+  const [tab, setTab] = useState('daily'); // 'daily' | 'monthly' | 'yearly'
+  const [busyKey, setBusyKey] = useState(null);
+
+  const TAB_CONFIG = {
+    daily: { label: 'รายวัน', rows: daily, dateKey: 'report_date', type: 'daily' },
+    monthly: { label: 'รายเดือน', rows: monthly, dateKey: 'report_month', type: 'monthly' },
+    yearly: { label: 'รายปี', rows: yearly, dateKey: 'report_year', type: 'yearly' },
+  };
+  const current = TAB_CONFIG[tab];
+
+  const handleDeleteRow = async (dateValue) => {
+    if (!window.confirm(`ต้องการลบข้อมูลสรุปคิว "${dateValue}" (${current.label}) ทิ้งถาวรใช่หรือไม่? ข้อมูลจะถูกลบออกจากฐานข้อมูลจริง`)) return;
+    setBusyKey(dateValue);
+    try {
+      const result = await deleteQueueSummary(current.type, dateValue);
+      if (result && result.ok === false) throw new Error(result.message || 'ลบไม่สำเร็จ');
+      onDeleted(current.type, dateValue);
+    } catch (err) {
+      alert(err.message || 'ลบข้อมูลไม่สำเร็จ');
+    }
+    setBusyKey(null);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="font-bold text-gray-800 text-sm">เลือกวัน/เดือน/ปี ที่ต้องการลบ</h4>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+        </div>
+
+        <div className="flex border-b border-gray-100 mb-3 shrink-0">
+          {Object.entries(TAB_CONFIG).map(([key, cfg]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`flex-1 py-2 text-xs font-bold transition ${tab === key ? 'text-red-600 border-b-2 border-red-500' : 'text-gray-400 hover:text-gray-500'}`}
+            >
+              {cfg.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="overflow-y-auto flex-1 space-y-1.5">
+          {current.rows.map((row) => {
+            const dateValue = row[current.dateKey];
+            const isBusy = busyKey === dateValue;
+            return (
+              <div key={dateValue} className="flex items-center justify-between bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+                <div className="text-sm">
+                  <span className="font-bold text-gray-700">{dateValue}</span>
+                  <span className="text-xs text-gray-400 ml-2">รวม {row.total_count || 0} คิว</span>
+                </div>
+                <button
+                  onClick={() => handleDeleteRow(dateValue)}
+                  disabled={isBusy}
+                  title={`ลบ ${dateValue}`}
+                  className="bg-red-50 hover:bg-red-100 text-red-600 p-1.5 rounded-md disabled:opacity-50 flex items-center justify-center"
+                >
+                  <TrashIcon size={14} />
+                </button>
+              </div>
+            );
+          })}
+          {current.rows.length === 0 && (
+            <p className="text-center text-gray-400 italic text-xs py-6">ยังไม่มีข้อมูลในหมวดนี้</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ReportView() {
   const [daily, setDaily] = useState([]);
   const [monthly, setMonthly] = useState([]);
@@ -1644,6 +1718,7 @@ function ReportView() {
   const [exporting, setExporting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -1684,6 +1759,17 @@ function ReportView() {
     setTimeout(() => setSyncMsg(''), 5000);
   };
 
+  // ลบแถวสรุปคิวออกจาก state ทันทีหลังลบสำเร็จใน Supabase เพื่อให้หน้าจอตรงกับฐานข้อมูลจริง
+  const handleDeleted = (type, dateValue) => {
+    if (type === 'daily') {
+      setDaily(prev => prev.filter(r => r.report_date !== dateValue));
+    } else if (type === 'monthly') {
+      setMonthly(prev => prev.filter(r => r.report_month !== dateValue));
+    } else if (type === 'yearly') {
+      setYearly(prev => prev.filter(r => r.report_year !== dateValue));
+    }
+  };
+
   if (loading) return <p className="text-gray-400 text-center py-10">กำลังโหลดรายงาน...</p>;
 
   return (
@@ -1706,6 +1792,13 @@ function ReportView() {
             >
               {syncing ? 'กำลังส่งข้อมูล...' : '📤 ส่งไป Google Sheet'}
             </button>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              title="ลบข้อมูลสรุปคิวตามวัน/เดือน/ปี"
+              className="bg-red-50 hover:bg-red-100 text-red-600 font-bold p-2.5 rounded-lg border border-red-200 flex items-center justify-center"
+            >
+              <TrashIcon size={16} />
+            </button>
           </div>
         )}
       </div>
@@ -1721,6 +1814,16 @@ function ReportView() {
           </>
         )}
       </div>
+
+      {showDeleteModal && (
+        <DeleteSummaryModal
+          daily={daily}
+          monthly={monthly}
+          yearly={yearly}
+          onClose={() => setShowDeleteModal(false)}
+          onDeleted={handleDeleted}
+        />
+      )}
     </div>
   );
 }

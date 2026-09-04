@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useRealtimeQueues } from './lib/useRealtimeQueues';
 import { useRealtimeStaff } from './lib/useRealtimeStaff';
 import { insertQueue, callNext, skipQueue, completeQueue, callSkipped, resetAllQueues, getDailySummary, getMonthlySummary, getYearlySummary, deleteQueueSummary } from './lib/queueApi';
-import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPassword, changeOwnPassword, updateStaffAvatar, deleteStaff, requestPasswordResetCode, verifyResetCodeAndSetPassword } from './lib/staffApi';
+import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPassword, changeOwnPassword, updateStaffAvatar, updateStaffName, deleteStaff, requestPasswordResetCode, verifyResetCodeAndSetPassword } from './lib/staffApi';
 import { QUEUE_TYPES, getTypeInfo, getSourceLabel, ROLE_INFO, PREFIX_READING } from './lib/constants';
 import { getTodayToken, buildScanUrl } from './lib/Qrtoken';
 import { printQueueTicket } from './lib/printTicket';
@@ -56,6 +56,16 @@ function RefreshIcon({ size = 14, className = "" }) {
     <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
       <path d="M21 12a9 9 0 1 1-2.64-6.36" />
       <polyline points="21 3 21 9 15 9" />
+    </svg>
+  );
+}
+
+// ไอคอนดินสอ — ใช้กับปุ่มแก้ไขชื่อ-นามสกุลในเมนูโปรไฟล์
+function PencilIcon({ size = 12, className = "" }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
     </svg>
   );
 }
@@ -334,6 +344,14 @@ export default function App() {
   const [changePasswordError, setChangePasswordError] = useState('');
   const [changePasswordLoading, setChangePasswordLoading] = useState(false);
 
+  // แก้ไขชื่อ-นามสกุล (ปุ่มดินสอในเมนูโปรไฟล์) — เขียนลง Supabase ตรงๆ ผ่าน updateStaffName
+  // ทำให้หน้า "จัดการสิทธิ์เจ้าหน้าที่" ของคนอื่นที่ subscribe realtime ตาราง staff อยู่แล้ว
+  // (ผ่าน useRealtimeStaff) เห็นชื่อใหม่ตรงกันแบบ real-time ทันที
+  const [showEditNameModal, setShowEditNameModal] = useState(false);
+  const [editNameValue, setEditNameValue] = useState('');
+  const [editNameError, setEditNameError] = useState('');
+  const [editNameLoading, setEditNameLoading] = useState(false);
+
   useEffect(() => {
     const stored = getStoredStaff();
     if (stored) setStaff(stored);
@@ -454,6 +472,39 @@ export default function App() {
     setChangePasswordLoading(false);
   };
 
+  // เปิด modal แก้ไขชื่อ — เติมค่าปัจจุบันของ staff ลงในฟอร์มก่อนเสมอ
+  const openEditNameModal = () => {
+    setEditNameValue(staff.full_name || '');
+    setEditNameError('');
+    setShowEditNameModal(true);
+  };
+
+  // บันทึกชื่อใหม่ลง Supabase ตรงๆ ผ่าน updateStaffName แล้วอัปเดต state/localStorage ของตัวเอง
+  // ฝั่งคนอื่นที่เปิดหน้า "จัดการสิทธิ์เจ้าหน้าที่" อยู่จะเห็นชื่อใหม่ทันทีผ่าน realtime subscription (useRealtimeStaff)
+  const handleEditNameSubmit = async () => {
+    setEditNameError('');
+    const trimmed = editNameValue.trim();
+    if (!trimmed) {
+      setEditNameError('กรุณากรอกชื่อ-นามสกุล');
+      return;
+    }
+    setEditNameLoading(true);
+    try {
+      const result = await updateStaffName(staff.id, trimmed);
+      if (result.ok) {
+        const updated = { ...staff, full_name: result.full_name };
+        setStaff(updated);
+        saveStaffToStorage(updated);
+        setShowEditNameModal(false);
+      } else {
+        setEditNameError(result.message || 'เปลี่ยนชื่อไม่สำเร็จ');
+      }
+    } catch (err) {
+      setEditNameError('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่');
+    }
+    setEditNameLoading(false);
+  };
+
   // ==========================================================
   // ถ้าเปิดมาจากการสแกน QR จริง -> แสดงเฉพาะหน้าคนไข้ ซ่อนแถบเมนู/แท็บทั้งหมด
   // ==========================================================
@@ -564,8 +615,17 @@ export default function App() {
                           <span className="font-black">{(staff.full_name || staff.username || '?').trim().charAt(0).toUpperCase()}</span>
                         )}
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-gray-800 text-sm truncate">{staff.full_name}</p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1">
+                          <p className="font-bold text-gray-800 text-sm truncate">{staff.full_name}</p>
+                          <button
+                            onClick={() => { setShowProfileMenu(false); openEditNameModal(); }}
+                            title="แก้ไขชื่อ"
+                            className="shrink-0 text-gray-400 hover:text-emerald-600 transition p-0.5"
+                          >
+                            <PencilIcon size={12} />
+                          </button>
+                        </div>
                         {staff.position && <p className="text-xs text-gray-500 truncate">{staff.position}</p>}
                         {staff.role === 'admin' && (
                           <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded">
@@ -600,6 +660,38 @@ export default function App() {
           </div>
         </div>
       </header>
+
+      {showEditNameModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !editNameLoading && setShowEditNameModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-bold text-gray-800 text-sm">แก้ไขชื่อ-นามสกุล</h4>
+              <button onClick={() => setShowEditNameModal(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-gray-500 block mb-1.5">ชื่อ-นามสกุล</label>
+                <input
+                  type="text"
+                  value={editNameValue}
+                  onChange={(e) => { setEditNameValue(e.target.value); setEditNameError(''); }}
+                  className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleEditNameSubmit(); }}
+                />
+              </div>
+              {editNameError && <p className="text-red-500 text-xs font-bold text-center">{editNameError}</p>}
+              <button
+                onClick={handleEditNameSubmit}
+                disabled={editNameLoading}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl"
+              >
+                {editNameLoading ? 'กำลังบันทึก...' : 'บันทึกชื่อใหม่'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showChangePasswordModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => !changePasswordLoading && setShowChangePasswordModal(false)}>

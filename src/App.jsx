@@ -6,9 +6,14 @@ import { loginStaff, registerStaff, setStaffApproval, setStaffRole, resetStaffPa
 import { QUEUE_TYPES, getTypeInfo, getSourceLabel, ROLE_INFO, PREFIX_READING } from './lib/constants';
 import { getTodayToken, buildScanUrl } from './lib/Qrtoken';
 import { printQueueTicket } from './lib/printTicket';
+import ReCAPTCHA from 'react-google-recaptcha';
 
 const COUNTERS = [1, 2];
 const STAFF_STORAGE_KEY = 'xray_staff_session';
+
+// Site key ของ reCAPTCHA (v2 checkbox) — ไปสมัครฟรีที่ https://www.google.com/recaptcha/admin
+// เลือกประเภท "reCAPTCHA v2" -> "ฉันไม่ใช่โปรแกรมอัตโนมัติ" (checkbox) แล้วเอา Site key มาใส่แทนค่านี้
+const RECAPTCHA_SITE_KEY = '6Lexe6gtAAAAAFO4kRBx1ya8w5gMUCvKTgizJUeV';
 
 // โลโก้โรงพยาบาลสงขลา (สีเขียว) — ใช้ที่หน้าจอมือถือคนไข้
 const HOSPITAL_LOGO_GREEN_SRC = "https://cdn.phototourl.com/free/2026-09-03-12722a13-ae77-4daa-87f1-85cd8fe06ed3.jpg";
@@ -615,6 +620,10 @@ function LoginView({ onLoggedIn }) {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [registerForm, setRegisterForm] = useState({ fullName: '', position: '', username: '', password: '', email: '', inviteCode: '' });
 
+  // reCAPTCHA กันบอทที่หน้าเข้าสู่ระบบเจ้าหน้าที่ — ต้องติ๊กถูกก่อนถึงจะกดเข้าสู่ระบบได้
+  const recaptchaRef = useRef(null);
+  const [recaptchaToken, setRecaptchaToken] = useState(null);
+
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotStep, setForgotStep] = useState('verify'); // 'verify' | 'code'
   const [forgotForm, setForgotForm] = useState({ username: '', email: '', code: '', newPassword: '', confirmPassword: '' });
@@ -694,6 +703,10 @@ function LoginView({ onLoggedIn }) {
       setError('กรุณากรอกชื่อบัญชีผู้ใช้และรหัสผ่านให้ครบ');
       return;
     }
+    if (!recaptchaToken) {
+      setError('กรุณายืนยันตัวตน "ฉันไม่ใช่โปรแกรมอัตโนมัติ" ก่อนเข้าสู่ระบบ');
+      return;
+    }
     setLoading(true);
     try {
       const result = await loginStaff(loginForm.username.trim(), loginForm.password);
@@ -701,9 +714,13 @@ function LoginView({ onLoggedIn }) {
         onLoggedIn(result.staff);
       } else {
         setError(result.message || 'เข้าสู่ระบบไม่สำเร็จ');
+        recaptchaRef.current && recaptchaRef.current.reset();
+        setRecaptchaToken(null);
       }
     } catch (err) {
       setError('เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + err.message);
+      recaptchaRef.current && recaptchaRef.current.reset();
+      setRecaptchaToken(null);
     }
     setLoading(false);
   };
@@ -750,8 +767,16 @@ function LoginView({ onLoggedIn }) {
                 <label className="text-xs font-bold text-gray-600 block mb-1.5">รหัสผ่าน</label>
                 <input type="password" value={loginForm.password} onChange={(e) => setLoginForm(f => ({ ...f, password: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') handleLogin(); }} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
               </div>
+              <div className="flex justify-center py-1">
+                <ReCAPTCHA
+                  ref={recaptchaRef}
+                  sitekey={RECAPTCHA_SITE_KEY}
+                  onChange={(token) => { setRecaptchaToken(token); setError(''); }}
+                  onExpired={() => setRecaptchaToken(null)}
+                />
+              </div>
               {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
-              <button onClick={handleLogin} disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl text-sm shadow-lg shadow-emerald-600/20 transition">
+              <button onClick={handleLogin} disabled={loading || !recaptchaToken} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl text-sm shadow-lg shadow-emerald-600/20 transition">
                 {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
               </button>
               <button type="button" onClick={openForgotModal} className="w-full text-center text-xs font-bold text-emerald-600 hover:underline">

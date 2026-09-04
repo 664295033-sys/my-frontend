@@ -123,6 +123,25 @@ export async function updateStaffAvatar(staffId, avatarDataUrl) {
 }
 
 // ==========================================================
+// แก้ไขชื่อ-นามสกุลของเจ้าหน้าที่ (ปุ่มดินสอในเมนูโปรไฟล์)
+// เขียนลงตาราง staff ใน Supabase ตรงๆ เหมือน updateStaffAvatar ด้านบน
+// ทำให้ข้อมูล full_name ที่หน้า "จัดการสิทธิ์เจ้าหน้าที่" ของคนอื่น (ที่ subscribe
+// realtime ตาราง staff อยู่แล้วผ่าน useRealtimeStaff) อัปเดตตรงกันแบบ real-time ทันที
+// ==========================================================
+export async function updateStaffName(staffId, newFullName) {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update({ full_name: newFullName })
+    .eq('id', staffId)
+    .select();
+  if (error) return { ok: false, message: error.message };
+  if (!data || data.length === 0) {
+    return { ok: false, message: 'เปลี่ยนชื่อไม่สำเร็จ: ไม่มีสิทธิ์แก้ไข (เช็ค Row Level Security ของตาราง staff ใน Supabase ให้อนุญาต UPDATE)' };
+  }
+  return { ok: true, full_name: data[0].full_name };
+}
+
+// ==========================================================
 // ลบบัญชีเจ้าหน้าที่ทิ้งถาวร (ใช้ในหน้าจัดการสิทธิ์ โดยผู้ดูแลระบบเท่านั้น)
 // ==========================================================
 export async function deleteStaff(targetId) {

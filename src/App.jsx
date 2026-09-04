@@ -856,10 +856,29 @@ function LoginView({ onLoggedIn }) {
 // ==========================================================
 function StaffDeskView() {
   const { queues } = useRealtimeQueues();
-  const [selectedCounter, setSelectedCounter] = useState(1);
+  const COUNTER_LOCK_KEY = 'xray_locked_counter';
+  const [selectedCounter, setSelectedCounter] = useState(() => {
+    try {
+      const saved = localStorage.getItem(COUNTER_LOCK_KEY);
+      return saved ? Number(saved) : 1;
+    } catch (e) { return 1; }
+  });
+  const [counterLocked, setCounterLocked] = useState(() => {
+    try { return localStorage.getItem(COUNTER_LOCK_KEY) !== null; } catch (e) { return false; }
+  });
   const [callTypeFilter, setCallTypeFilter] = useState('all');
   const [busy, setBusy] = useState(false);
   const prevWaitingCountRef = useRef(null);
+
+  const handleSaveCounter = () => {
+    try { localStorage.setItem(COUNTER_LOCK_KEY, String(selectedCounter)); } catch (e) { /* no-op */ }
+    setCounterLocked(true);
+  };
+
+  const handleCancelCounterLock = () => {
+    try { localStorage.removeItem(COUNTER_LOCK_KEY); } catch (e) { /* no-op */ }
+    setCounterLocked(false);
+  };
 
   const waitingQueues = queues.filter(q => q.status === 'waiting');
   const skippedQueues = queues.filter(q => q.status === 'skipped');
@@ -967,9 +986,21 @@ function StaffDeskView() {
           <div className="flex gap-2 mb-3">
             <div className="flex-1">
               <label className="text-[11px] font-bold text-gray-500 block mb-1">เลือกช่องบริการ</label>
-              <select value={selectedCounter} onChange={(e) => setSelectedCounter(Number(e.target.value))} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold">
-                {COUNTERS.map(c => <option key={c} value={c}>ช่องที่ {c}</option>)}
-              </select>
+              <div className="flex gap-1.5">
+                <select
+                  value={selectedCounter}
+                  onChange={(e) => setSelectedCounter(Number(e.target.value))}
+                  disabled={counterLocked}
+                  className={`flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold ${counterLocked ? 'bg-gray-100 text-gray-500' : ''}`}
+                >
+                  {COUNTERS.map(c => <option key={c} value={c}>ช่องที่ {c}</option>)}
+                </select>
+                {counterLocked ? (
+                  <button onClick={handleCancelCounterLock} className="shrink-0 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-3 py-2 rounded-lg text-xs">ยกเลิก</button>
+                ) : (
+                  <button onClick={handleSaveCounter} className="shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-2 rounded-lg text-xs">บันทึก</button>
+                )}
+              </div>
             </div>
             <div className="flex-1">
               <label className="text-[11px] font-bold text-gray-500 block mb-1">เลือกประเภทคิวที่จะเรียก</label>

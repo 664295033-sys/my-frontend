@@ -1022,7 +1022,7 @@ function StaffDeskView() {
             <div className="flex flex-wrap gap-1">
               {waitingQueues.map(q => (
                 <div key={q.id} className="flex items-center gap-0.5 px-1 py-0.5 rounded border font-bold text-[9px] bg-gray-50 border-gray-200 text-gray-600">
-                  <span>{q.queue_no}</span>
+                  <span>{q.queue_no}{q.source === 'mobile' && <span className="text-blue-500 font-semibold"> (มือถือ)</span>}</span>
                   <span className={`text-[7px] font-bold px-0.5 rounded ${getTypeInfo(q.queue_type).badgeClass}`}>{getTypeInfo(q.queue_type).shortLabel}</span>
                 </div>
               ))}
@@ -1044,7 +1044,7 @@ function StaffDeskView() {
             <div className="space-y-2">
               {skippedQueues.map(q => (
                 <div key={q.id} className="bg-red-50 border border-red-200 text-red-700 px-2.5 py-1.5 rounded-lg font-bold flex items-center gap-1.5 text-xs">
-                  <span>{q.queue_no}</span>
+                  <span>{q.queue_no}{q.source === 'mobile' && <span className="font-semibold"> (มือถือ)</span>}</span>
                   <div className="ml-auto flex items-center gap-1">
                     {COUNTERS.map(c => (
                       <button key={c} onClick={() => run(async () => { await callSkipped(q.id, c); playBeep(); speakQueue(q.queue_no, c); })} disabled={busy} className="px-1.5 py-0.5 text-[10px] hover:bg-red-200 rounded-md">ช่อง{c}</button>

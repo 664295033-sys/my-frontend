@@ -344,9 +344,7 @@ export default function App() {
   const [changePasswordError, setChangePasswordError] = useState('');
   const [changePasswordLoading, setChangePasswordLoading] = useState(false);
 
-  // แก้ไขชื่อ-นามสกุล (ปุ่มดินสอในเมนูโปรไฟล์) — เขียนลง Supabase ตรงๆ ผ่าน updateStaffName
-  // ทำให้หน้า "จัดการสิทธิ์เจ้าหน้าที่" ของคนอื่นที่ subscribe realtime ตาราง staff อยู่แล้ว
-  // (ผ่าน useRealtimeStaff) เห็นชื่อใหม่ตรงกันแบบ real-time ทันที
+  // แก้ไขชื่อ-นามสกุลจากเมนูโปรไฟล์ (ปุ่มดินสอข้างชื่อ)
   const [showEditNameModal, setShowEditNameModal] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
   const [editNameError, setEditNameError] = useState('');
@@ -472,15 +470,6 @@ export default function App() {
     setChangePasswordLoading(false);
   };
 
-  // เปิด modal แก้ไขชื่อ — เติมค่าปัจจุบันของ staff ลงในฟอร์มก่อนเสมอ
-  const openEditNameModal = () => {
-    setEditNameValue(staff.full_name || '');
-    setEditNameError('');
-    setShowEditNameModal(true);
-  };
-
-  // บันทึกชื่อใหม่ลง Supabase ตรงๆ ผ่าน updateStaffName แล้วอัปเดต state/localStorage ของตัวเอง
-  // ฝั่งคนอื่นที่เปิดหน้า "จัดการสิทธิ์เจ้าหน้าที่" อยู่จะเห็นชื่อใหม่ทันทีผ่าน realtime subscription (useRealtimeStaff)
   const handleEditNameSubmit = async () => {
     setEditNameError('');
     const trimmed = editNameValue.trim();
@@ -492,7 +481,7 @@ export default function App() {
     try {
       const result = await updateStaffName(staff.id, trimmed);
       if (result.ok) {
-        const updated = { ...staff, full_name: result.full_name };
+        const updated = { ...staff, full_name: trimmed };
         setStaff(updated);
         saveStaffToStorage(updated);
         setShowEditNameModal(false);
@@ -615,13 +604,13 @@ export default function App() {
                           <span className="font-black">{(staff.full_name || staff.username || '?').trim().charAt(0).toUpperCase()}</span>
                         )}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
                           <p className="font-bold text-gray-800 text-sm truncate">{staff.full_name}</p>
                           <button
-                            onClick={() => { setShowProfileMenu(false); openEditNameModal(); }}
-                            title="แก้ไขชื่อ"
-                            className="shrink-0 text-gray-400 hover:text-emerald-600 transition p-0.5"
+                            onClick={() => { setEditNameValue(staff.full_name || ''); setEditNameError(''); setShowEditNameModal(true); }}
+                            title="แก้ไขชื่อ-นามสกุล"
+                            className="shrink-0 text-gray-400 hover:text-emerald-600 hover:bg-emerald-100 p-1 rounded-md transition"
                           >
                             <PencilIcon size={12} />
                           </button>
@@ -675,9 +664,9 @@ export default function App() {
                   type="text"
                   value={editNameValue}
                   onChange={(e) => { setEditNameValue(e.target.value); setEditNameError(''); }}
-                  className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm"
-                  autoFocus
                   onKeyDown={(e) => { if (e.key === 'Enter') handleEditNameSubmit(); }}
+                  className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-3 py-2.5 text-sm transition"
+                  autoFocus
                 />
               </div>
               {editNameError && <p className="text-red-500 text-xs font-bold text-center">{editNameError}</p>}
@@ -1495,6 +1484,12 @@ function MobileQueueView() {
   const lastStatusRef = useRef(null);
   const queueCardRef = useRef(null);
 
+  // เมื่อพบว่าเบอร์นี้มีคิววันนี้ที่ยังไม่เสร็จอยู่แล้ว (duplicate: true จาก insertQueue)
+  // ให้เปิด modal ถามผู้ใช้ว่าจะ "เอาคิวเดิม" (เผื่อปัดหน้าจอออกไปแล้วคิวหาย) หรือ "ออกคิวใหม่" เลย
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [duplicateQueue, setDuplicateQueue] = useState(null);
+  const [duplicateResolving, setDuplicateResolving] = useState(false);
+
   const myQueue = queues.find(q => q.id === selectedQueueId) || null;
 
   const downloadQueueImage = async () => {
@@ -1559,6 +1554,19 @@ function MobileQueueView() {
     return '';
   };
 
+  // ทำขั้นตอนสุดท้ายให้เหมือนกันไม่ว่าจะเป็นคิวใหม่ที่เพิ่งออก หรือคิวเดิมที่ผู้ใช้เลือกเก็บไว้
+  // isNew ใช้คุมว่าจะเล่นเสียง "คิวใหม่เข้าระบบ" หรือไม่ (คิวเดิมไม่ต้องเล่นเสียงซ้ำ)
+  const finishQueueSetup = (queue, { isNew }) => {
+    saveIdentifierToStorage(identifierInput.trim());
+    saveQueueRefToStorage(queue);
+    lastStatusRef.current = queue.status;
+    setSelectedQueueId(queue.id);
+    setShowForm(false);
+    if (isNew) playNewQueueChime();
+    setShowSuccessToast(true);
+    setTimeout(() => setShowSuccessToast(false), 5000);
+  };
+
   const handleSubmit = async () => {
     const err = validateIdentifier(identifierInput);
     if (err) { setIdentifierError(err); return; }
@@ -1568,18 +1576,41 @@ function MobileQueueView() {
     setScanTime(currentTimeStr);
     try {
       const result = await insertQueue({ source: 'mobile', identifier: identifierInput.trim(), queueType: 'opd' });
-      saveIdentifierToStorage(identifierInput.trim());
-      saveQueueRefToStorage(result.queue);
-      lastStatusRef.current = result.queue.status;
-      setSelectedQueueId(result.queue.id);
-      setShowForm(false);
-      playNewQueueChime();
-      setShowSuccessToast(true);
-      setTimeout(() => setShowSuccessToast(false), 5000);
+      if (result.duplicate) {
+        // เบอร์นี้มีคิวของวันนี้ที่ยังไม่เสร็จอยู่แล้ว -> ให้ผู้ใช้เลือกเองว่าจะเอาคิวเดิมหรือออกใหม่
+        setDuplicateQueue(result.queue);
+        setShowDuplicateModal(true);
+        setSubmitting(false);
+        return;
+      }
+      finishQueueSetup(result.queue, { isNew: true });
     } catch (err) {
       setIdentifierError('เกิดข้อผิดพลาดในการออกคิว กรุณาลองใหม่');
     }
     setSubmitting(false);
+  };
+
+  // ผู้ใช้เลือก "ต้องการคิวเดิม" — ใช้คิวเดิมที่ระบบเจอ ไม่ต้องออกคิวใหม่
+  const handleKeepExistingQueue = () => {
+    if (!duplicateQueue) return;
+    finishQueueSetup(duplicateQueue, { isNew: false });
+    setShowDuplicateModal(false);
+    setDuplicateQueue(null);
+  };
+
+  // ผู้ใช้เลือก "ต้องการออกคิวใหม่" — เรียก insertQueue อีกครั้งพร้อม forceNew ข้ามการเช็คคิวซ้ำ
+  const handleRequestNewQueue = async () => {
+    setDuplicateResolving(true);
+    try {
+      const result = await insertQueue({ source: 'mobile', identifier: identifierInput.trim(), queueType: 'opd', forceNew: true });
+      finishQueueSetup(result.queue, { isNew: true });
+      setShowDuplicateModal(false);
+      setDuplicateQueue(null);
+    } catch (err) {
+      setIdentifierError('เกิดข้อผิดพลาดในการออกคิวใหม่ กรุณาลองใหม่');
+      setShowDuplicateModal(false);
+    }
+    setDuplicateResolving(false);
   };
 
   const getStatusText = () => {
@@ -1604,6 +1635,37 @@ function MobileQueueView() {
 
   return (
     <div className="max-w-md mx-auto bg-white h-[85vh] w-full rounded-[2.25rem] shadow-xl shadow-gray-200/60 border border-gray-100 overflow-y-auto overflow-x-hidden flex flex-col text-gray-900 relative">
+      {showDuplicateModal && duplicateQueue && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-50 text-amber-500 flex items-center justify-center mb-3">
+              <XRayIcon size={26} />
+            </div>
+            <h4 className="text-base font-bold text-gray-900 mb-1">พบคิวเดิมของคุณวันนี้</h4>
+            <p className="text-sm text-gray-500 mb-5 leading-relaxed">
+              เบอร์นี้มีคิวหมายเลข <span className="font-bold text-emerald-600">{duplicateQueue.queue_no}</span> ที่ยังไม่เสร็จสิ้นอยู่แล้ว
+              ต้องการทำอย่างไรต่อ?
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={handleKeepExistingQueue}
+                disabled={duplicateResolving}
+                className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-bold text-sm py-3 rounded-2xl transition active:scale-[0.98]"
+              >
+                ต้องการคิวเดิม (คิว {duplicateQueue.queue_no})
+              </button>
+              <button
+                onClick={handleRequestNewQueue}
+                disabled={duplicateResolving}
+                className="w-full bg-gray-100 hover:bg-gray-200 disabled:opacity-60 text-gray-700 font-bold text-sm py-3 rounded-2xl transition active:scale-[0.98]"
+              >
+                {duplicateResolving ? 'กำลังออกคิวใหม่...' : 'ต้องการออกคิวใหม่'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showSuccessToast && myQueue && (
         <div className="absolute top-3 left-3 right-3 bg-white p-3.5 rounded-2xl shadow-xl border border-gray-100 z-50 flex gap-3 items-center text-left">
           <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-500 shrink-0">

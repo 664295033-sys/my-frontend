@@ -70,6 +70,52 @@ function PencilIcon({ size = 12, className = "" }) {
   );
 }
 
+// ไอคอนรูปตา / ตาปิด — ใช้กับปุ่มดูรหัสผ่านในช่องกรอกรหัสผ่านทุกจุด
+function EyeIcon({ size = 16, className = "" }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeOffIcon({ size = 16, className = "" }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.3 20.3 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a20.35 20.35 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}
+
+// ช่องกรอกรหัสผ่านที่มีปุ่มรูปตาสำหรับสลับดู/ซ่อนรหัสผ่าน — ใช้ร่วมกันทุกจุดที่มีการกรอกรหัสผ่าน
+function PasswordInput({ value, onChange, placeholder, onKeyDown, autoFocus, inputClassName = "" }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        type={visible ? 'text' : 'password'}
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        className={inputClassName || "w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 pr-11 text-sm transition"}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible(v => !v)}
+        tabIndex={-1}
+        title={visible ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600 transition"
+      >
+        {visible ? <EyeOffIcon size={17} /> : <EyeIcon size={17} />}
+      </button>
+    </div>
+  );
+}
+
 function getStoredStaff() {
   try {
     const raw = localStorage.getItem(STAFF_STORAGE_KEY);
@@ -749,7 +795,7 @@ function LoginView({ onLoggedIn }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-  const [registerForm, setRegisterForm] = useState({ fullName: '', position: '', username: '', password: '', email: '', inviteCode: '' });
+  const [registerForm, setRegisterForm] = useState({ fullName: '', position: '', username: '', password: '', confirmPassword: '', email: '', inviteCode: '' });
 
   // reCAPTCHA กันบอทที่หน้าเข้าสู่ระบบเจ้าหน้าที่ — ต้องติ๊กถูกก่อนถึงจะกดเข้าสู่ระบบได้
   const recaptchaRef = useRef(null);
@@ -858,9 +904,17 @@ function LoginView({ onLoggedIn }) {
 
   const handleRegister = async () => {
     setError('');
-    const { fullName, username, password } = registerForm;
+    const { fullName, username, password, confirmPassword } = registerForm;
     if (!fullName.trim() || !username.trim() || !password) {
       setError('กรุณากรอกข้อมูลที่จำเป็นให้ครบ');
+      return;
+    }
+    if (password.length < 6) {
+      setError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('รหัสผ่านทั้งสองช่องไม่ตรงกัน กรุณากรอกให้เหมือนกัน');
       return;
     }
     setLoading(true);
@@ -896,7 +950,11 @@ function LoginView({ onLoggedIn }) {
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-600 block mb-1.5">รหัสผ่าน</label>
-                <input type="password" value={loginForm.password} onChange={(e) => setLoginForm(f => ({ ...f, password: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Enter') handleLogin(); }} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
+                <PasswordInput
+                  value={loginForm.password}
+                  onChange={(e) => setLoginForm(f => ({ ...f, password: e.target.value }))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleLogin(); }}
+                />
               </div>
               <div className="flex justify-center py-1">
                 <ReCAPTCHA
@@ -920,7 +978,16 @@ function LoginView({ onLoggedIn }) {
               <input type="text" placeholder="ตำแหน่งงาน" value={registerForm.position} onChange={(e) => setRegisterForm(f => ({ ...f, position: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
               <input type="text" placeholder="ชื่อบัญชีผู้ใช้" value={registerForm.username} onChange={(e) => setRegisterForm(f => ({ ...f, username: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
               <input type="email" placeholder="อีเมล" value={registerForm.email} onChange={(e) => setRegisterForm(f => ({ ...f, email: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
-              <input type="password" placeholder="รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)" value={registerForm.password} onChange={(e) => setRegisterForm(f => ({ ...f, password: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
+              <PasswordInput
+                placeholder="รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)"
+                value={registerForm.password}
+                onChange={(e) => setRegisterForm(f => ({ ...f, password: e.target.value }))}
+              />
+              <PasswordInput
+                placeholder="ยืนยันรหัสผ่านอีกครั้ง"
+                value={registerForm.confirmPassword}
+                onChange={(e) => setRegisterForm(f => ({ ...f, confirmPassword: e.target.value }))}
+              />
               <input type="text" placeholder="รหัสเชิญเข้าร่วมทีมงาน" value={registerForm.inviteCode} onChange={(e) => setRegisterForm(f => ({ ...f, inviteCode: e.target.value }))} className="w-full border-2 border-gray-200 focus:border-emerald-400 outline-none rounded-xl px-4 py-2.5 text-sm transition" />
               {error && <p className="text-red-500 text-xs font-bold text-center">{error}</p>}
               <button onClick={handleRegister} disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl text-sm shadow-lg shadow-emerald-600/20 transition">

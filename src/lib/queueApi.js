@@ -32,6 +32,10 @@ function buildQueueNo(queueType, todaysQueues) {
  * ออกคิวใหม่
  * @param {{source: 'paper'|'mobile', identifier?: string, queueType?: string}} params
  * คืนค่าเสมอในรูปแบบ { duplicate: boolean, queue: {...} }
+ *
+ * หมายเหตุ: ทุกครั้งที่ insert แถวใหม่เข้าตารางนี้สำเร็จ Postgres trigger
+ * (bump_queue_summary — ดูไฟล์ migration_reset_and_summary.sql) จะบวกยอด
+ * เข้าตาราง daily/monthly/yearly_queue_summary ให้อัตโนมัติทันที ไม่ต้องเรียกจากฝั่งนี้เพิ่ม
  */
 export async function insertQueue({ source, identifier, queueType }) {
   // กันคิวซ้ำ (คิวมือถือ): เช็คว่ามีคิวของวันนี้ที่ยังไม่จบ (waiting/calling) ผูกกับเบอร์นี้อยู่แล้วหรือไม่
@@ -117,7 +121,11 @@ export async function completeQueue(queueId) {
   if (error) throw error;
 }
 
-/** รีเซ็ตคิวที่ยัง waiting/calling ทั้งหมด (ประวัติยังเก็บไว้ในตาราง ไม่ถูกลบทิ้ง) */
+/** รีเซ็ตคิวที่ยัง waiting/calling ทั้งหมด (ประวัติยังเก็บไว้ในตาราง ไม่ถูกลบทิ้ง)
+ *  ปุ่มนี้ใช้กดรีเซ็ตกลางวันโดยพนักงานเอง — แยกออกจากการล้างตารางอัตโนมัติทุกเที่ยงคืน
+ *  ที่ตั้งไว้ผ่าน pg_cron (ดูไฟล์ migration_reset_and_summary.sql) ซึ่งจะ "ลบ" แถวทิ้งจริง
+ *  ไม่ใช่แค่เปลี่ยนสถานะเป็น 'reset' แบบฟังก์ชันนี้
+ */
 export async function resetAllQueues() {
   const { error } = await supabase
     .from(TABLE)
@@ -128,7 +136,12 @@ export async function resetAllQueues() {
 
 // ==========================================================
 // รายงานสรุปคิวแยกตามประเภท (รายวัน / รายเดือน / รายปี)
-// ดึงจาก view ที่สร้างไว้ใน Supabase — ต้องรัน SQL สร้าง view ก่อนใช้งาน (ดูไฟล์ report_views.sql)
+//
+// ตั้งแต่ migration_reset_and_summary.sql ตาราง 3 ตัวนี้เป็น "ตารางจริง"
+// ที่ถูกบวกยอดอัตโนมัติผ่าน Postgres trigger ทุกครั้งที่มีการออกคิวใหม่ใน
+// xray_queues — ไม่ใช่ view ที่คำนวณสดแบบเดิมอีกต่อไป ดังนั้นแม้ xray_queues
+// จะถูกล้างทิ้งอัตโนมัติทุกเที่ยงคืน ตัวเลขในรายงานตรงนี้จะยังอยู่ครบ
+// จนกว่าเจ้าหน้าที่จะกดลบเองผ่านหน้ารายงาน (deleteQueueSummary ด้านล่าง)
 // ==========================================================
 export async function getDailySummary() {
   const { data, error } = await supabase.from('daily_queue_summary').select('*').order('report_date', { ascending: true });
@@ -149,42 +162,34 @@ export async function getYearlySummary() {
 }
 
 // ==========================================================
-// ลบข้อมูลคิวออกจากตารางจริง (xray_queues) ตามวัน/เดือน/ปีที่เลือกจากหน้ารายงาน
-// ลบตรงที่ตารางต้นทาง ไม่ใช่ที่ view สรุป เพราะ view คำนวณจากตารางนี้อยู่แล้ว
-// เมื่อลบเสร็จ ให้เรียก getDailySummary/getMonthlySummary/getYearlySummary ใหม่ที่หน้าเว็บ
-// เพื่อให้ตัวเลขที่แสดงตรงกับข้อมูลจริงใน Supabase ทันที
+// ลบข้อมูลสรุปคิวตามวัน/เดือน/ปีที่เลือกจากหน้ารายงาน
+//
+// หมายเหตุสำคัญ: ตั้งแต่มี migration แยกตารางสรุปออกจาก xray_queues แล้ว
+// (ดูไฟล์ migration_reset_and_summary.sql) ตาราง daily_queue_summary /
+// monthly_queue_summary / yearly_queue_summary เป็น "ตารางจริง" ที่ไม่ผูกกับ
+// ข้อมูลใน xray_queues อีกต่อไป (ตาราง xray_queues จะถูกล้างทิ้งอัตโนมัติทุก
+// เที่ยงคืนโดย cron job แต่ตารางสรุปจะยังอยู่ถาวร) ดังนั้นการลบข้อมูลสรุป
+// จึงต้องลบที่ตารางสรุปโดยตรง ไม่ใช่ไปลบที่ xray_queues แบบเดิมอีกแล้ว
 // ==========================================================
 export async function deleteQueueSummary(type, value) {
   if (!value) return { ok: false, message: 'กรุณาระบุวัน/เดือน/ปีที่ต้องการลบ' };
 
-  let rangeStart;
-  let rangeEnd;
-
+  let table;
+  let column;
   if (type === 'day') {
-    // value เช่น '2026-09-03'
-    rangeStart = `${value}T00:00:00`;
-    rangeEnd = `${value}T23:59:59.999`;
+    table = 'daily_queue_summary';
+    column = 'report_date';
   } else if (type === 'month') {
-    // value เช่น '2026-09'
-    const [y, m] = value.split('-');
-    if (!y || !m) return { ok: false, message: 'รูปแบบเดือนไม่ถูกต้อง' };
-    const lastDay = new Date(Number(y), Number(m), 0).getDate();
-    rangeStart = `${y}-${m}-01T00:00:00`;
-    rangeEnd = `${y}-${m}-${String(lastDay).padStart(2, '0')}T23:59:59.999`;
+    table = 'monthly_queue_summary';
+    column = 'report_month';
   } else if (type === 'year') {
-    // value เช่น '2026'
-    rangeStart = `${value}-01-01T00:00:00`;
-    rangeEnd = `${value}-12-31T23:59:59.999`;
+    table = 'yearly_queue_summary';
+    column = 'report_year';
   } else {
     return { ok: false, message: 'ประเภทไม่ถูกต้อง' };
   }
 
-  const { error } = await supabase
-    .from(TABLE)
-    .delete()
-    .gte('created_at', rangeStart)
-    .lte('created_at', rangeEnd);
-
+  const { error } = await supabase.from(table).delete().eq(column, value);
   if (error) return { ok: false, message: error.message };
   return { ok: true };
 }

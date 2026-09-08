@@ -111,6 +111,24 @@ export async function callSkipped(queueId, counterNo) {
   return data;
 }
 
+/**
+ * เรียกซ้ำคิวที่กำลัง "calling" อยู่แล้ว (ปุ่ม "เรียกซ้ำ" ที่โต๊ะพนักงาน)
+ * ไม่แตะ status หรือ counter_no เพราะเป็นคิวเดิมที่ช่องเดิมอยู่แล้ว — แค่อัปเดต
+ * called_at ให้เป็นเวลาปัจจุบัน เพื่อให้ Realtime ส่งสัญญาณไปหาหน้าจอทีวี ซึ่งจะเป็น
+ * คนตรวจจับการเปลี่ยนแปลงนี้แล้วเล่นเสียงเรียกคิวซ้ำให้คนไข้ฟัง (ดู DisplayView ใน App.jsx
+ * — โต๊ะพนักงานจะไม่เล่นเสียงเองแล้ว เพื่อกันเสียงซ้อนกัน)
+ */
+export async function recallQueue(queueId) {
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update({ called_at: new Date().toISOString() })
+    .eq('id', queueId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function skipQueue(queueId) {
   const { error } = await supabase.from(TABLE).update({ status: 'skipped', counter_no: null }).eq('id', queueId);
   if (error) throw error;

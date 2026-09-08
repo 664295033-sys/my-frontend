@@ -145,22 +145,6 @@ function getScanParams() {
 
 // ==========================================================
 // ตัวจัดการ AudioContext แบบ "ใช้ตัวเดียวร่วมกันทั้งแอป" (singleton)
-//
-// ที่มาของปัญหาเดิม: ทุกครั้งที่จะเล่นเสียง โค้ดจะสร้าง `new AudioContext()` ใหม่
-// ทุกครั้ง (ในทุกฟังก์ชัน playBeep / playNewQueueChime / playSkipAlert) เบราว์เซอร์
-// มือถือ โดยเฉพาะ Chrome บน Android จะสร้าง AudioContext ใหม่ในสถานะ "suspended"
-// เสมอ จนกว่าจะมีการแตะ/คลิกหน้าเว็บนั้น "โดยตรง" แล้วเรียก .resume()
-//
-// ปัญหาคือเสียงเรียกคิวในแอปนี้ถูกสั่งเล่นตอนข้อมูล Realtime เปลี่ยน (มีคนกดเรียก
-// คิวจากอีกเครื่อง) ไม่ใช่จากการแตะหน้าจอนี้โดยตรง — แถมหน้าจอทีวี (DisplayView)
-// เป็นแท็บที่เปิดเป็นค่าเริ่มต้นทันทีที่ล็อกอินอัตโนมัติจาก localStorage (ไม่มีการ
-// แตะหน้าจอเลยตั้งแต่โหลดหน้า) จึงไม่มีเสียงออกเลยบนมือถือ/แท็บเล็ต Android
-//
-// วิธีแก้: ใช้ AudioContext ตัวเดียวตลอดทั้งเซสชัน (ไม่สร้างใหม่ทุกครั้ง) +
-// ฟังก์ชัน unlockAudio() ที่ต้องถูกเรียกจาก event handler ที่เกิดจากการแตะ/คลิก
-// จริงของผู้ใช้อย่างน้อย 1 ครั้ง เพื่อ resume() context ให้ค้างอยู่ในสถานะ
-// "running" ตลอดไป แล้วเสียงที่เล่นภายหลังแบบอัตโนมัติ (จาก Realtime) จะออกได้
-// ดู <SoundUnlockOverlay> ใน DisplayView และการเรียก unlockAudio() ในปุ่มต่างๆ
 // ==========================================================
 let sharedAudioCtx = null;
 let audioUnlocked = false;
@@ -181,8 +165,6 @@ function unlockAudio() {
   if (ctx && ctx.state === 'suspended') {
     ctx.resume().catch(() => {});
   }
-  // เล่นเสียงเบามากๆ (แทบไม่ได้ยิน) 1 ครั้งเพื่อ "อุ่นเครื่อง" ให้เบราว์เซอร์เชื่อว่า
-  // context นี้ถูกใช้งานจากการแตะจริง อนุญาตให้เล่นเสียงถัดไปแบบอัตโนมัติได้
   if (ctx) {
     try {
       const osc = ctx.createOscillator();
@@ -194,8 +176,6 @@ function unlockAudio() {
       osc.stop(ctx.currentTime + 0.01);
     } catch (e) { /* no-op */ }
   }
-  // อุ่นเครื่อง speechSynthesis ด้วย — บางเบราว์เซอร์มือถือต้องมีการ speak() ครั้งแรก
-  // ที่เกิดจากการแตะหน้าจอโดยตรงก่อน ถึงจะพูดอัตโนมัติในครั้งถัดไปได้
   if ('speechSynthesis' in window) {
     try {
       const warmup = new SpeechSynthesisUtterance(' ');
@@ -207,15 +187,6 @@ function unlockAudio() {
   try { window.dispatchEvent(new Event('xray-audio-unlocked')); } catch (e) { /* no-op */ }
 }
 
-// ==========================================================
-// เสียงต่างๆ ในระบบ — WebAudio ล้วนๆ ไม่ต้องมีไฟล์เสียงแนบ
-// 1) playBeep          -> เสียงเรียกคิว (ขึ้นจอทีวี / แจ้งเตือนคนไข้ที่มือถือ / เรียกซ้ำ)
-// 2) playNewQueueChime -> เสียงคิวใหม่เข้ามาในระบบ (ออกบัตร/สแกน QR สำเร็จ)
-// 3) playSkipAlert     -> เสียงเตือนเมื่อมีคิวถูกข้าม/ไม่มาแสดงตัว
-// ทั้ง 3 ฟังก์ชันนี้ใช้ AudioContext ตัวเดียวกันร่วมกัน (getAudioContext) แทนการ
-// สร้างใหม่ทุกครั้ง และพยายาม resume() ซ้ำทุกครั้งก่อนเล่น เผื่อ OS ระงับ context
-// ไว้ระหว่างที่หน้าจอไม่ได้ใช้งาน (เช่น จอทีวีเปิดค้างไว้นานๆ)
-// ==========================================================
 function playBeep() {
   try {
     const ctx = getAudioContext();
@@ -284,10 +255,6 @@ function playSkipAlert() {
   } catch (e) { /* no-op */ }
 }
 
-// ==========================================================
-// เสียงเรียกคิวภาษาไทย (Text-to-Speech) — เลือกเสียงไทยที่ดีที่สุดที่เครื่องมีให้
-// เก็บ voice ที่เลือกไว้ในตัวแปร module-level กันเลือกซ้ำทุกครั้งที่เรียก
-// ==========================================================
 let cachedThaiVoice = null;
 let thaiVoicePicked = false;
 function pickBestThaiVoice() {
@@ -313,12 +280,9 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
   window.speechSynthesis.addEventListener('voiceschanged', pickBestThaiVoice);
 }
 
-// พูดหมายเลขคิวเป็นภาษาไทย เช่น "ขอเชิญหมายเลข เอ็กซ์ ศูนย์ ศูนย์ หนึ่ง ที่ช่องบริการที่ 1"
 function speakQueue(queueNo, counterNo) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
-  // บาง Android/Chrome จะค้าง speechSynthesis ไว้ในสถานะ paused โดยไม่ทราบสาเหตุ
-  // (มักเกิดหลังหน้าจอถูกพักหน้าจอ/สลับแอปแล้วกลับมา) ต้อง resume() ก่อนพูดทุกครั้ง
   if (window.speechSynthesis.paused) {
     try { window.speechSynthesis.resume(); } catch (e) { /* no-op */ }
   }
@@ -337,9 +301,6 @@ function speakQueue(queueNo, counterNo) {
   window.speechSynthesis.speak(utterance);
 }
 
-// ==========================================================
-// โหลด html2canvas จาก CDN แบบ lazy (ใช้ตอนบันทึกภาพบัตรคิวบนมือถือคนไข้เท่านั้น)
-// ==========================================================
 let html2canvasLoadingPromise = null;
 function loadHtml2Canvas() {
   if (window.html2canvas) return Promise.resolve(window.html2canvas);
@@ -354,9 +315,6 @@ function loadHtml2Canvas() {
   return html2canvasLoadingPromise;
 }
 
-// ==========================================================
-// โหลด SheetJS (xlsx) จาก CDN แบบ lazy — ใช้ตอนดาวน์โหลดรายงานเป็นไฟล์ Excel
-// ==========================================================
 let xlsxLoadingPromise = null;
 function loadXLSX() {
   if (window.XLSX) return Promise.resolve(window.XLSX);
@@ -371,9 +329,6 @@ function loadXLSX() {
   return xlsxLoadingPromise;
 }
 
-// ==========================================================
-// สร้างไฟล์ Excel (.xlsx) จากรายงานสรุปคิว 3 ชีท: รายวัน/รายเดือน/รายปี
-// ==========================================================
 async function exportReportToExcel(daily, monthly, yearly) {
   const XLSX = await loadXLSX();
   const wb = XLSX.utils.book_new();
@@ -397,11 +352,6 @@ async function exportReportToExcel(daily, monthly, yearly) {
   XLSX.writeFile(wb, `รายงานสรุปคิว-โรงพยาบาลสงขลา-${today}.xlsx`);
 }
 
-// ==========================================================
-// ส่งข้อมูลรายงานไปอัปเดตที่ Google Sheet ผ่าน Google Apps Script Web App
-// ต้องสร้าง Google Sheet ใหม่ -> Extensions -> Apps Script -> วางโค้ดจากไฟล์ google_sheet_sync.gs
-// -> Deploy เป็น Web App (Execute as: Me, Who has access: Anyone) -> เอา URL มาใส่ด้านล่างนี้
-// ==========================================================
 const GOOGLE_SHEET_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxDadsoQKpKJquEQmKExvNLVOAMssuQetSJ8BRJkfYqjG20PanvQs4DLqPSqsPf2gXa/exec';
 
 async function syncReportToGoogleSheet(daily, monthly, yearly) {
@@ -415,7 +365,7 @@ async function syncReportToGoogleSheet(daily, monthly, yearly) {
     body: JSON.stringify({ daily, monthly, yearly }),
   });
 }
-// ==========================================================
+
 function resizeImageToDataUrl(file, maxSize = 200, quality = 0.7) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -473,12 +423,6 @@ export default function App() {
     if (stored) setStaff(stored);
   }, []);
 
-  // ==========================================================
-  // ปลดล็อกเสียงอัตโนมัติ (Web Audio + speechSynthesis) ทันทีที่ผู้ใช้แตะ/คลิก
-  // หน้าเว็บนี้เป็นครั้งแรก ไม่ว่าจะแตะตรงไหนก็ตาม (ปุ่มแท็บ, ปุ่มโต๊ะพนักงาน,
-  // ฟอร์มฝั่งคนไข้ ฯลฯ) — จำเป็นมากบน Android ที่บล็อกเสียงอัตโนมัติซึ่งไม่ได้เกิด
-  // จากการแตะหน้าจอโดยตรง ดู unlockAudio() ด้านบนของไฟล์
-  // ==========================================================
   useEffect(() => {
     if (audioUnlocked) return;
     const handleFirstInteraction = () => { unlockAudio(); };
@@ -490,8 +434,6 @@ export default function App() {
     };
   }, []);
 
-  // เมื่อกลับมาที่แท็บ/ปลุกหน้าจอ (เช่น จอทีวี Android ล็อกหน้าจอแล้วเปิดใหม่) ให้ resume
-  // AudioContext ที่อาจถูกระบบปฏิบัติการสั่งพักไว้ระหว่างที่หน้าจอไม่ได้แสดงผล
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible' && audioUnlocked) {
@@ -503,11 +445,6 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
-  // ==========================================================
-  // ปรับ viewport meta + reset margin/scrollbar ของ html/body/#root ให้เท่ากันทุก
-  // แพลตฟอร์ม (Windows Chrome/Edge และกล่อง Android WebView) เพื่อไม่ให้ระยะขอบ,
-  // การซูมของหน้าเว็บ หรือ scrollbar ที่ไม่เท่ากันทำให้หน้าจอทีวีดูไม่เหมือนกัน
-  // ==========================================================
   useEffect(() => {
     let meta = document.querySelector('meta[name="viewport"]');
     if (!meta) {
@@ -532,10 +469,6 @@ export default function App() {
     return () => { document.head.removeChild(resetStyle); };
   }, []);
 
-  // ==========================================================
-  // ปิดการเลือก/คัดลอกข้อความทั้งเว็บ + ปิดเมนูคลิกขวา ให้ดูเป็นมืออาชีพ
-  // (ยังคงพิมพ์/แก้ไขได้ปกติใน input, textarea และช่องที่ใส่ class "selectable")
-  // ==========================================================
   useEffect(() => {
     const style = document.createElement('style');
     style.setAttribute('data-no-select', 'true');
@@ -559,7 +492,6 @@ export default function App() {
 
     const handleContextMenu = (e) => {
       const target = e.target;
-      // อนุญาตคลิกขวาปกติเฉพาะในช่องกรอกข้อมูล กันไม่ให้เจ้าหน้าที่แก้ไขข้อความในช่องกรอกลำบาก
       const tag = target.tagName ? target.tagName.toLowerCase() : '';
       if (tag === 'input' || tag === 'textarea' || target.isContentEditable) return;
       e.preventDefault();
@@ -572,7 +504,6 @@ export default function App() {
     };
   }, []);
 
-  // ปิดเมนูโปรไฟล์เมื่อคลิกนอกกล่องเมนู
   useEffect(() => {
     if (!showProfileMenu) return;
     const handleClickOutside = (e) => {
@@ -671,9 +602,6 @@ export default function App() {
     setEditNameLoading(false);
   };
 
-  // ==========================================================
-  // ถ้าเปิดมาจากการสแกน QR จริง -> แสดงเฉพาะหน้าคนไข้ ซ่อนแถบเมนู/แท็บทั้งหมด
-  // ==========================================================
   if (scanInfo.isScan) {
     const todayToken = getTodayToken();
     const isExpired = scanInfo.qrTokenParam !== todayToken;
@@ -684,9 +612,6 @@ export default function App() {
     );
   }
 
-  // ==========================================================
-  // ถ้ายังไม่ได้ล็อกอิน -> โชว์แค่หน้าล็อกอินอย่างเดียว ไม่มีแถบเมนู/แท็บใดๆ ทั้งสิ้น
-  // ==========================================================
   if (!staff) {
     return (
       <div className="min-h-screen bg-emerald-50/60 font-sans text-gray-900 flex flex-col">
@@ -928,7 +853,6 @@ function LoginView({ onLoggedIn }) {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [registerForm, setRegisterForm] = useState({ fullName: '', position: '', username: '', password: '', confirmPassword: '', email: '', inviteCode: '' });
 
-  // reCAPTCHA กันบอทที่หน้าเข้าสู่ระบบเจ้าหน้าที่ — ต้องติ๊กถูกก่อนถึงจะกดเข้าสู่ระบบได้
   const recaptchaRef = useRef(null);
   const [recaptchaToken, setRecaptchaToken] = useState(null);
 
@@ -1238,7 +1162,6 @@ function StaffDeskView() {
   const skippedQueues = queues.filter(q => q.status === 'skipped');
   const activeQueue = queues.find(q => q.status === 'calling' && q.counter_no === selectedCounter) || null;
 
-  // เสียงแจ้งเตือนที่โต๊ะพนักงานเมื่อมีคิวใหม่เข้ามาในระบบ (กันไม่ให้พลาดคิวที่คนไข้สแกน QR เอง)
   useEffect(() => {
     if (prevWaitingCountRef.current !== null && waitingQueues.length > prevWaitingCountRef.current) {
       playNewQueueChime();
@@ -1247,13 +1170,12 @@ function StaffDeskView() {
   }, [waitingQueues.length]);
 
   const run = async (fn) => {
-    unlockAudio(); // ปลดล็อกเสียงให้จอทีวีเล่นอัตโนมัติได้ตั้งแต่การคลิกปุ่มโต๊ะพนักงานครั้งแรก
+    unlockAudio();
     setBusy(true);
     try { await fn(); } catch (err) { console.error(err.message); alert(err.message); }
     setBusy(false);
   };
 
-  // ต้องเปิดหน้าต่างพิมพ์แบบ synchronous ก่อน await ใดๆ ไม่งั้นเบราว์เซอร์บล็อก popup
   const runInsertAndPrint = async (queueType) => {
     unlockAudio();
     const printWindow = window.open('', '_blank', 'width=380,height=640');
@@ -1272,8 +1194,6 @@ function StaffDeskView() {
 
   const handleRecall = () => {
     if (!activeQueue) return;
-    // ไม่เล่นเสียงที่โต๊ะพนักงานเอง — แค่สั่งอัปเดต called_at ที่ฐานข้อมูล (เหมือนพนักงานกดเรียกจริง)
-    // แล้วปล่อยให้หน้าจอทีวี (DisplayView) เป็นคนตรวจจับการเปลี่ยนแปลงและเล่นเสียงเรียกคิวให้คนไข้ฟังแทน
     run(() => recallQueue(activeQueue.id));
   };
 
@@ -1392,16 +1312,7 @@ function StaffDeskView() {
 }
 
 // ==========================================================
-// หน้าจอแสดงผล (ทีวี) — โลโก้, แถบประกาศวิ่ง, QR, ปุ่มเต็มจอ, ประวัติคิว, เสียงเรียกคิว/คิวเข้าใหม่/ข้ามคิว
-//
-// หมายเหตุสำคัญ: จอนี้ต้อง "เต็มขอบจอเสมอ" ไม่ว่าจะเป็นการเปิดผ่านเบราว์เซอร์บน
-// Windows หรือกล่องแอนดรอยด์ทีวี — เดิมทีตอนยังไม่ได้กด requestFullscreen() จริง
-// (ซึ่งบนกล่อง Android หลายรุ่นกด "ขยายเต็มจอ" แล้ว Fullscreen API ไม่ทำงานเพราะ
-// เว็บวิวไม่รองรับ หรือรีโมทไม่ได้สร้าง user-gesture ที่เบราว์เซอร์ยอมรับ) หน้าจอจะ
-// เหลือแค่การ์ดกลางจอที่มีขอบ/มุมโค้ง/พื้นหลังขาวรอบๆ ทำให้หน้าตาไม่เหมือนกับที่
-// ตั้งใจออกแบบไว้ (ดูภาพเทียบ Windows vs Android ที่ผู้ใช้แนบมา) จึงเปลี่ยนให้จอนี้
-// เต็มจอ (w-screen + 100dvh, ไม่มีขอบ/มุมโค้ง) อยู่เสมอโดยไม่ขึ้นกับสถานะ Fullscreen
-// API เลย ปุ่มขยายเต็มจอยังคงไว้เป็นตัวเสริมไว้ซ่อนแถบเบราว์เซอร์/แถบระบบเท่านั้น
+// หน้าจอแสดงผล (ทีวี)
 // ==========================================================
 function DisplayView() {
   const { queues } = useRealtimeQueues();
@@ -1412,10 +1323,32 @@ function DisplayView() {
   const [qrToken, setQrToken] = useState(getTodayToken());
 
   // ==========================================================
-  // สถานะ "เปิดใช้เสียงแล้วหรือยัง" — จอทีวีนี้มักถูกเปิดขึ้นอัตโนมัติจากเซสชันที่
-  // ล็อกอินค้างไว้ (localStorage) โดยไม่มีการแตะหน้าจอเลย ทำให้ Android บล็อกเสียง
-  // เรียกคิวทั้งหมด ต้องมีการ์ด "แตะเพื่อเปิดเสียง" ให้พนักงานแตะ 1 ครั้งตอนเปิดจอ
+  // Scale-to-fit: ออกแบบหน้าจอนี้ที่ความละเอียดคงที่ 1920x1080 เสมอ แล้วคำนวณ
+  // scale = min(ความกว้างจอจริง/1920, ความสูงจอจริง/1080) มาย่อ/ขยายทั้งบล็อกเป็น
+  // หน่วยเดียว (transform: scale) แล้ว center ไว้กลางจอด้วย flex ของ container นอก
+  // วิธีนี้การันตีว่า QR / ช่องที่ 1 / ช่องที่ 2 / ประวัติคิว จะแสดงครบทุกชิ้นเสมอ
+  // ไม่โดนตัดขอบ ไม่ว่ากล่อง Android TV เครื่องนั้นจะมีความละเอียดหรือสัดส่วนจอ
+  // ต่างจาก Windows/Chrome แค่ไหนก็ตาม (ถ้าสัดส่วนไม่ตรงกันเป๊ะ จะเกิดแถบดำ
+  // ซ้าย-ขวา หรือ บน-ล่าง แทนการตัดเนื้อหาทิ้ง)
   // ==========================================================
+  const DESIGN_W = 1920;
+  const DESIGN_H = 1080;
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    const updateScale = () => {
+      const s = Math.min(window.innerWidth / DESIGN_W, window.innerHeight / DESIGN_H);
+      setScale(s > 0 ? s : 1);
+    };
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    window.addEventListener('orientationchange', updateScale);
+    return () => {
+      window.removeEventListener('resize', updateScale);
+      window.removeEventListener('orientationchange', updateScale);
+    };
+  }, []);
+
   const [audioReady, setAudioReady] = useState(audioUnlocked);
   useEffect(() => {
     if (audioReady) return;
@@ -1439,7 +1372,6 @@ function DisplayView() {
       setTimeString(now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
       setDateString(now.toLocaleDateString('th-TH', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }));
     }, 1000);
-    // เช็ครหัส QR ประจำวันซ้ำเป็นระยะ เผื่อจอทีวีเปิดค้างไว้ข้ามเที่ยงคืน จะได้อัปเดต QR ให้เองอัตโนมัติ
     const tokenTimer = setInterval(() => setQrToken(getTodayToken()), 60000);
     return () => {
       clearInterval(clockTimer);
@@ -1453,13 +1385,12 @@ function DisplayView() {
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
   }, []);
 
-  // พยายามขอ Fullscreen API จริงให้อัตโนมัติตั้งแต่โหลดจอนี้ครั้งแรก (เผื่อกล่อง Android
-  // หรือเบราว์เซอร์รุ่นนั้นอนุญาต) แต่ไม่พึ่งพาผลลัพธ์นี้ในการจัดวางหน้าจอ (ดู containerClass
-  // ด้านล่างที่เต็มจอเสมออยู่แล้ว) — ทำเพียงเพื่อซ่อนแถบระบบ/เบราว์เซอร์เป็นโบนัสเท่านั้น
+  // ขอ Fullscreen API จาก "container นอกสุด" เสมอ (ไม่ใช่ canvas ที่ถูก scale)
+  // เพื่อให้ครอบคลุมพื้นที่จริงทั้งหมดของจอตอนกดเต็มจอ
   useEffect(() => {
     const el = displayRef.current;
     if (el && el.requestFullscreen) {
-      el.requestFullscreen().catch(() => { /* เบราว์เซอร์บล็อกเพราะไม่มี user-gesture ก็ไม่เป็นไร ยังเต็มจอด้วย CSS อยู่ดี */ });
+      el.requestFullscreen().catch(() => { /* ไม่มี user-gesture ก็ไม่เป็นไร ยังพอดีจอด้วย scale-to-fit อยู่ดี */ });
     }
   }, []);
 
@@ -1481,13 +1412,6 @@ function DisplayView() {
   const waitingQueues = queues.filter(q => q.status === 'waiting');
   const skippedQueues = queues.filter(q => q.status === 'skipped');
 
-  // เสียงเรียกคิว (บี๊บ + พูดหมายเลขคิวเป็นภาษาไทย) ขึ้นจอทีวีเท่านั้น
-  // จำลองว่า "พนักงานเป็นคนกด คนไข้ที่นั่งรอหน้าทีวีเป็นคนได้ยิน" — โต๊ะพนักงานเองจะไม่เล่นเสียงนี้อีกต่อไป
-  // เพื่อกันเสียงซ้อนกัน (ดูการแก้ไขใน StaffDeskView: ปุ่มเรียกคิว/เรียกซ้ำ/เรียกคิวข้าม ไม่เล่นเสียงเองแล้ว)
-  //
-  // ใช้ signature = "id|called_at" แทนการเทียบแค่ id เฉยๆ เพื่อให้จับได้ทั้ง 2 กรณี:
-  // 1) เรียกคิวใหม่ -> id เปลี่ยน
-  // 2) กด "เรียกซ้ำ" คิวเดิม -> id เดิม แต่ called_at ถูกอัปเดตใหม่ที่ฐานข้อมูล (ผ่าน recallQueue)
   useEffect(() => {
     COUNTERS.forEach(c => {
       const current = currentCalling[c];
@@ -1505,7 +1429,6 @@ function DisplayView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentCalling[1]?.id, currentCalling[1]?.called_at, currentCalling[2]?.id, currentCalling[2]?.called_at]);
 
-  // เสียงคิวใหม่เข้ามาในระบบ
   useEffect(() => {
     if (prevWaitingCountRef.current !== null && waitingQueues.length > prevWaitingCountRef.current) {
       playNewQueueChime();
@@ -1513,7 +1436,6 @@ function DisplayView() {
     prevWaitingCountRef.current = waitingQueues.length;
   }, [waitingQueues.length]);
 
-  // เสียงเตือนเมื่อมีคิวถูกข้าม
   useEffect(() => {
     if (prevSkippedCountRef.current !== null && skippedQueues.length > prevSkippedCountRef.current) {
       playSkipAlert();
@@ -1543,144 +1465,155 @@ function DisplayView() {
   return (
     <div
       ref={displayRef}
-      className="bg-black shadow-none flex flex-col justify-between relative overflow-hidden text-white font-sans w-screen rounded-none border-0 fixed inset-0 z-[60]"
+      className="fixed inset-0 z-[60] bg-black flex items-center justify-center overflow-hidden"
       style={{ height: '100dvh', minHeight: '100vh' }}
     >
-      <button
-        onClick={toggleFullscreen}
-        title={isFullscreen ? 'ออกจากโหมดเต็มจอ' : 'ขยายเต็มจอ'}
-        className="absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white flex items-center justify-center transition active:scale-95 border border-white/20"
+      <div
+        style={{
+          width: DESIGN_W,
+          height: DESIGN_H,
+          transform: `scale(${scale})`,
+          transformOrigin: 'center center',
+          flexShrink: 0,
+        }}
+        className="relative bg-black text-white font-sans flex flex-col justify-between overflow-hidden"
       >
-        {isFullscreen ? '⤡' : '⤢'}
-      </button>
+        <button
+          onClick={toggleFullscreen}
+          title={isFullscreen ? 'ออกจากโหมดเต็มจอ' : 'ขยายเต็มจอ'}
+          className="absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white flex items-center justify-center transition active:scale-95 border border-white/20"
+        >
+          {isFullscreen ? '⤡' : '⤢'}
+        </button>
 
-      {!audioReady && (
-        <div className="absolute inset-0 z-40 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center gap-4 text-center px-6">
-          <div className="w-20 h-20 rounded-full bg-emerald-500/15 border-2 border-emerald-400 text-emerald-300 flex items-center justify-center text-4xl animate-pulse">
-            🔊
-          </div>
-          <h3 className="text-2xl font-black text-white">แตะหน้าจอเพื่อเปิดเสียงเรียกคิว</h3>
-          <p className="text-sm text-white/60 max-w-md leading-relaxed">
-            เบราว์เซอร์ต้องการให้แตะหน้าจอนี้ 1 ครั้งก่อน จึงจะเล่นเสียง "บี๊บ" และเสียงพูดเรียกคิว
-            ได้อัตโนมัติเวลามีการเรียกคิวเข้ามา (ข้อจำกัดด้านความปลอดภัยของเบราว์เซอร์บนมือถือ/แท็บเล็ต)
-          </p>
-          <button
-            onClick={handleEnableSound}
-            className="mt-2 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-base px-8 py-3.5 rounded-2xl shadow-lg shadow-emerald-500/30 transition active:scale-95"
-          >
-            🔊 เปิดใช้งานเสียง
-          </button>
-        </div>
-      )}
-
-      <div className="bg-white text-black py-4 px-8 flex justify-between items-center shadow-lg z-10 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-[#0e8345] rounded-full flex items-center justify-center text-white font-black text-xl shadow-md border-2 border-emerald-100">X</div>
-          <div className="hidden sm:block text-left">
-            <span className="text-xs font-bold text-emerald-600 block tracking-wider uppercase">X-Ray Department</span>
-            <span className="text-[10px] text-gray-400 block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
-          </div>
-        </div>
-        <div className="text-center flex-grow">
-          <h2 className="text-3xl font-black text-[#10309c] tracking-wide">หมายเลขเรียกเอกซเรย์</h2>
-          <p className="text-xs font-semibold text-gray-500 mt-1">{dateString} • {timeString}</p>
-        </div>
-        <div className="w-16 h-16 rounded-full flex items-center justify-center shrink-0 bg-emerald-50 border-2 border-emerald-200 text-emerald-600 font-black text-2xl">
-          SKH
-        </div>
-      </div>
-
-      <div className="bg-[#102d94] text-white py-3 px-6 border-b border-blue-900 z-10 flex items-center gap-4 overflow-hidden relative shadow-inner w-full">
-        <div className="bg-red-600 text-white text-xs font-extrabold px-3 py-1 rounded-md uppercase tracking-wider flex items-center gap-1.5 shrink-0 z-20 shadow-md">
-          <span className="w-2 h-2 rounded-full bg-white animate-ping"></span><span>ประกาศสำคัญ</span>
-        </div>
-        <div className="relative flex-1 overflow-hidden h-6 flex items-center z-10">
-          <div className="marquee-track font-bold text-base md:text-lg text-[#ccff00]">
-            เรียกคิวรับบริการเอกซเรย์ ช่องที่ 1 - 2 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-            <span className="text-white font-black">|</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-            <span className="text-red-400">⚠️ {skippedText}</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 px-4 py-4 flex-grow items-stretch z-10 bg-gray-950">
-        <div className="flex flex-col border-2 border-gray-800 bg-[#111827] shadow-2xl relative rounded-2xl overflow-hidden">
-          <div className="py-6 px-4 text-center font-black text-3xl tracking-wide text-emerald-400 border-b border-white/10 uppercase">
-            สแกนรับคิว
-          </div>
-          <div className="flex-grow flex flex-col justify-center items-center py-8 px-6 gap-4 min-h-[220px]">
-            <div className="bg-white p-3 rounded-2xl shadow-lg">
-              <img src={qrCodeSrc} alt="QR Code สำหรับสแกนรับคิว" className="w-40 h-40 sm:w-44 sm:h-44 rounded" />
+        {!audioReady && (
+          <div className="absolute inset-0 z-40 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center gap-4 text-center px-6">
+            <div className="w-20 h-20 rounded-full bg-emerald-500/15 border-2 border-emerald-400 text-emerald-300 flex items-center justify-center text-4xl animate-pulse">
+              🔊
             </div>
-            <p className="text-xs text-gray-400 text-center max-w-[220px] leading-relaxed">
-              สแกนด้วยกล้องมือถือเพื่อรับบัตรคิวดิจิทัลและติดตามคิวได้ทันที
+            <h3 className="text-2xl font-black text-white">แตะหน้าจอเพื่อเปิดเสียงเรียกคิว</h3>
+            <p className="text-sm text-white/60 max-w-md leading-relaxed">
+              เบราว์เซอร์ต้องการให้แตะหน้าจอนี้ 1 ครั้งก่อน จึงจะเล่นเสียง "บี๊บ" และเสียงพูดเรียกคิว
+              ได้อัตโนมัติเวลามีการเรียกคิวเข้ามา (ข้อจำกัดด้านความปลอดภัยของเบราว์เซอร์บนมือถือ/แท็บเล็ต)
             </p>
+            <button
+              onClick={handleEnableSound}
+              className="mt-2 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-base px-8 py-3.5 rounded-2xl shadow-lg shadow-emerald-500/30 transition active:scale-95"
+            >
+              🔊 เปิดใช้งานเสียง
+            </button>
+          </div>
+        )}
+
+        <div className="bg-white text-black py-4 px-8 flex justify-between items-center shadow-lg z-10 border-b border-gray-200 shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-[#0e8345] rounded-full flex items-center justify-center text-white font-black text-xl shadow-md border-2 border-emerald-100">X</div>
+            <div className="hidden sm:block text-left">
+              <span className="text-xs font-bold text-emerald-600 block tracking-wider uppercase">X-Ray Department</span>
+              <span className="text-[10px] text-gray-400 block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
+            </div>
+          </div>
+          <div className="text-center flex-grow">
+            <h2 className="text-3xl font-black text-[#10309c] tracking-wide">หมายเลขเรียกเอกซเรย์</h2>
+            <p className="text-xs font-semibold text-gray-500 mt-1">{dateString} • {timeString}</p>
+          </div>
+          <div className="w-16 h-16 rounded-full flex items-center justify-center shrink-0 bg-emerald-50 border-2 border-emerald-200 text-emerald-600 font-black text-2xl">
+            SKH
           </div>
         </div>
 
-        {COUNTERS.map(counterNo => {
-          const activeQueue = currentCalling[counterNo];
-          const style = counterStyles[counterNo];
-          return (
-            <div key={counterNo} className={`flex flex-col border-2 ${style.borderColor} ${style.bgColor} shadow-2xl transition-all duration-300 relative rounded-2xl`}>
-              <div className={`py-6 px-4 text-center font-black text-3xl tracking-wide ${style.headerTextColor} border-b border-white/10 uppercase`}>
-                ช่องที่ {counterNo}
-              </div>
-              <div className="flex-grow flex flex-col justify-center items-center py-12 px-4 min-h-[220px]">
-                {activeQueue ? (
-                  <div className="text-center w-full">
-                    <div className="text-8xl md:text-[110px] leading-none font-black text-white tracking-tighter drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)] animate-pulse">
-                      {activeQueue.queue_no}
-                    </div>
-                    <div className="mt-6 text-sm font-semibold text-white/60 tracking-widest flex items-center justify-center gap-1.5 uppercase">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#ccff00] animate-pulse"></span>
-                      กำลังตรวจ
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-6 opacity-30">
-                    <div className="text-6xl font-black tracking-widest text-white/50">- - -</div>
-                    <p className="mt-2 text-xs text-white/40 font-bold uppercase tracking-wider">ว่าง / ไม่มีคิว</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="px-4 pb-4 z-10 bg-gray-950 text-left">
-        <div className="bg-gray-900 border border-gray-800 rounded-xl p-3.5 flex flex-col shadow-xl min-h-[100px]">
-          <div className="border-b border-gray-800 pb-1.5 mb-2 flex justify-between items-center">
-            <span className="text-xs font-bold text-gray-400 tracking-wider">ประวัติคิวก่อนหน้า</span>
+        <div className="bg-[#102d94] text-white py-3 px-6 border-b border-blue-900 z-10 flex items-center gap-4 overflow-hidden relative shadow-inner w-full shrink-0">
+          <div className="bg-red-600 text-white text-xs font-extrabold px-3 py-1 rounded-md uppercase tracking-wider flex items-center gap-1.5 shrink-0 z-20 shadow-md">
+            <span className="w-2 h-2 rounded-full bg-white animate-ping"></span><span>ประกาศสำคัญ</span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {recentHistory.map(q => (
-              <div key={q.id} className="flex items-center gap-2 py-1.5 px-3.5 rounded-lg bg-gray-950/60 border border-gray-800 text-gray-400 text-xs">
-                <div className="font-bold text-gray-300">{q.queue_no}</div>
-                <div className="text-[10px] flex items-center gap-1 text-gray-500">
-                  <span>ช่อง</span><span className="font-extrabold text-blue-400 text-xs">{q.counter_no}</span>
+          <div className="relative flex-1 overflow-hidden h-6 flex items-center z-10">
+            <div className="marquee-track font-bold text-base md:text-lg text-[#ccff00]">
+              เรียกคิวรับบริการเอกซเรย์ ช่องที่ 1 - 2 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+              <span className="text-white font-black">|</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+              <span className="text-red-400">⚠️ {skippedText}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 px-4 py-4 flex-grow items-stretch z-10 bg-gray-950 min-h-0">
+          <div className="flex flex-col border-2 border-gray-800 bg-[#111827] shadow-2xl relative rounded-2xl overflow-hidden">
+            <div className="py-6 px-4 text-center font-black text-3xl tracking-wide text-emerald-400 border-b border-white/10 uppercase">
+              สแกนรับคิว
+            </div>
+            <div className="flex-grow flex flex-col justify-center items-center py-8 px-6 gap-4 min-h-[220px]">
+              <div className="bg-white p-3 rounded-2xl shadow-lg">
+                <img src={qrCodeSrc} alt="QR Code สำหรับสแกนรับคิว" className="w-40 h-40 sm:w-44 sm:h-44 rounded" />
+              </div>
+              <p className="text-xs text-gray-400 text-center max-w-[220px] leading-relaxed">
+                สแกนด้วยกล้องมือถือเพื่อรับบัตรคิวดิจิทัลและติดตามคิวได้ทันที
+              </p>
+            </div>
+          </div>
+
+          {COUNTERS.map(counterNo => {
+            const activeQueue = currentCalling[counterNo];
+            const style = counterStyles[counterNo];
+            return (
+              <div key={counterNo} className={`flex flex-col border-2 ${style.borderColor} ${style.bgColor} shadow-2xl transition-all duration-300 relative rounded-2xl`}>
+                <div className={`py-6 px-4 text-center font-black text-3xl tracking-wide ${style.headerTextColor} border-b border-white/10 uppercase`}>
+                  ช่องที่ {counterNo}
+                </div>
+                <div className="flex-grow flex flex-col justify-center items-center py-12 px-4 min-h-[220px]">
+                  {activeQueue ? (
+                    <div className="text-center w-full">
+                      <div className="text-8xl md:text-[110px] leading-none font-black text-white tracking-tighter drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)] animate-pulse">
+                        {activeQueue.queue_no}
+                      </div>
+                      <div className="mt-6 text-sm font-semibold text-white/60 tracking-widest flex items-center justify-center gap-1.5 uppercase">
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#ccff00] animate-pulse"></span>
+                        กำลังตรวจ
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 opacity-30">
+                      <div className="text-6xl font-black tracking-widest text-white/50">- - -</div>
+                      <p className="mt-2 text-xs text-white/40 font-bold uppercase tracking-wider">ว่าง / ไม่มีคิว</p>
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
-            {recentHistory.length === 0 && (
-              <div className="text-center text-gray-600 italic py-2 text-[10px] w-full">ไม่มีประวัติคิวก่อนหน้า</div>
-            )}
+            );
+          })}
+        </div>
+
+        <div className="px-4 pb-4 z-10 bg-gray-950 text-left shrink-0">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl p-3.5 flex flex-col shadow-xl min-h-[100px]">
+            <div className="border-b border-gray-800 pb-1.5 mb-2 flex justify-between items-center">
+              <span className="text-xs font-bold text-gray-400 tracking-wider">ประวัติคิวก่อนหน้า</span>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {recentHistory.map(q => (
+                <div key={q.id} className="flex items-center gap-2 py-1.5 px-3.5 rounded-lg bg-gray-950/60 border border-gray-800 text-gray-400 text-xs">
+                  <div className="font-bold text-gray-300">{q.queue_no}</div>
+                  <div className="text-[10px] flex items-center gap-1 text-gray-500">
+                    <span>ช่อง</span><span className="font-extrabold text-blue-400 text-xs">{q.counter_no}</span>
+                  </div>
+                </div>
+              ))}
+              {recentHistory.length === 0 && (
+                <div className="text-center text-gray-600 italic py-2 text-[10px] w-full">ไม่มีประวัติคิวก่อนหน้า</div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      <style>{`
-        @keyframes marquee-scroll {
-          0% { transform: translateX(100%); }
-          100% { transform: translateX(-100%); }
-        }
-        .marquee-track {
-          display: inline-block;
-          white-space: nowrap;
-          animation: marquee-scroll 25s linear infinite;
-        }
-      `}</style>
+        <style>{`
+          @keyframes marquee-scroll {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+          }
+          .marquee-track {
+            display: inline-block;
+            white-space: nowrap;
+            animation: marquee-scroll 25s linear infinite;
+          }
+        `}</style>
+      </div>
     </div>
   );
 }
@@ -1724,7 +1657,6 @@ function getStoredQueueRef() {
 function clearStoredQueueRef() {
   try { localStorage.removeItem(getTodayQueueStorageKey()); } catch (e) { /* no-op */ }
 }
-// ต้องกรอกเบอร์โทร 10 หลักยืนยันตัวตนก่อนถึงจะออกคิวให้ — กันคิวซ้ำแบบยึดตัวตนคนไข้จริง
 const IDENTIFIER_STORAGE_KEY = 'xray_patient_identifier';
 function saveIdentifierToStorage(v) {
   try { localStorage.setItem(IDENTIFIER_STORAGE_KEY, v); } catch (e) { /* no-op */ }
@@ -1752,8 +1684,6 @@ function MobileQueueView() {
   const lastStatusRef = useRef(null);
   const queueCardRef = useRef(null);
 
-  // เมื่อพบว่าเบอร์นี้มีคิววันนี้ที่ยังไม่เสร็จอยู่แล้ว (duplicate: true จาก insertQueue)
-  // ให้เปิด modal ถามผู้ใช้ว่าจะ "เอาคิวเดิม" (เผื่อปัดหน้าจอออกไปแล้วคิวหาย) หรือ "ออกคิวใหม่" เลย
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateQueue, setDuplicateQueue] = useState(null);
   const [duplicateResolving, setDuplicateResolving] = useState(false);
@@ -1822,8 +1752,6 @@ function MobileQueueView() {
     return '';
   };
 
-  // ทำขั้นตอนสุดท้ายให้เหมือนกันไม่ว่าจะเป็นคิวใหม่ที่เพิ่งออก หรือคิวเดิมที่ผู้ใช้เลือกเก็บไว้
-  // isNew ใช้คุมว่าจะเล่นเสียง "คิวใหม่เข้าระบบ" หรือไม่ (คิวเดิมไม่ต้องเล่นเสียงซ้ำ)
   const finishQueueSetup = (queue, { isNew }) => {
     saveIdentifierToStorage(identifierInput.trim());
     saveQueueRefToStorage(queue);
@@ -1836,7 +1764,7 @@ function MobileQueueView() {
   };
 
   const handleSubmit = async () => {
-    unlockAudio(); // แตะปุ่มนี้ = user gesture จริง ใช้ปลดล็อกเสียง "ถึงคิว" (playBeep) ที่จะเล่นภายหลังแบบอัตโนมัติ
+    unlockAudio();
     const err = validateIdentifier(identifierInput);
     if (err) { setIdentifierError(err); return; }
     setIdentifierError('');
@@ -1846,7 +1774,6 @@ function MobileQueueView() {
     try {
       const result = await insertQueue({ source: 'mobile', identifier: identifierInput.trim(), queueType: 'opd' });
       if (result.duplicate) {
-        // เบอร์นี้มีคิวของวันนี้ที่ยังไม่เสร็จอยู่แล้ว -> ให้ผู้ใช้เลือกเองว่าจะเอาคิวเดิมหรือออกใหม่
         setDuplicateQueue(result.queue);
         setShowDuplicateModal(true);
         setSubmitting(false);
@@ -1859,7 +1786,6 @@ function MobileQueueView() {
     setSubmitting(false);
   };
 
-  // ผู้ใช้เลือก "ต้องการคิวเดิม" — ใช้คิวเดิมที่ระบบเจอ ไม่ต้องออกคิวใหม่
   const handleKeepExistingQueue = () => {
     if (!duplicateQueue) return;
     finishQueueSetup(duplicateQueue, { isNew: false });
@@ -1867,7 +1793,6 @@ function MobileQueueView() {
     setDuplicateQueue(null);
   };
 
-  // ผู้ใช้เลือก "ต้องการออกคิวใหม่" — เรียก insertQueue อีกครั้งพร้อม forceNew ข้ามการเช็คคิวซ้ำ
   const handleRequestNewQueue = async () => {
     setDuplicateResolving(true);
     try {
@@ -1888,7 +1813,7 @@ function MobileQueueView() {
     if (myQueue.status === 'completed') return 'คุณเข้ารับบริการเสร็จสิ้นแล้ว';
     if (myQueue.status === 'skipped') return 'คุณไม่มาแสดงตัวตามกำหนด คิวถูกข้าม กรุณาติดต่อเจ้าหน้าที่หน้าห้อง';
     if (myQueue.status === 'reset') return 'คิวนี้ถูกรีเซ็ตโดยเจ้าหน้าที่ กรุณาสแกน QR ใหม่เพื่อรับคิว';
-    return null; // waiting -> แสดงจำนวนคิวรอแทน
+    return null;
   };
 
   const waitingCount = (() => {
@@ -2091,7 +2016,7 @@ function MobileQueueView() {
 }
 
 // ==========================================================
-// รายงานสรุปคิวแยกตามประเภท — รายวัน/รายเดือน/รายปี (หน้าตาตามชีทสรุปคิว)
+// รายงานสรุปคิวแยกตามประเภท — รายวัน/รายเดือน/รายปี
 // ==========================================================
 const REPORT_TYPE_COLS = [
   { key: 'ipd_count', label: 'ผู้ป่วยใน (IPD)' },
@@ -2131,15 +2056,13 @@ function ReportTable({ title, rows, dateKey, dateLabel }) {
 }
 
 // ==========================================================
-// Modal เลือกวัน/เดือน/ปี ที่จะลบข้อมูลสรุปคิว — ลบจริงใน Supabase ผ่าน deleteQueueSummary
+// Modal เลือกวัน/เดือน/ปี ที่จะลบข้อมูลสรุปคิว
 // ==========================================================
 function DeleteSummaryModal({ daily, monthly, yearly, onClose, onDeleted }) {
   const [tab, setTab] = useState('daily'); // 'daily' | 'monthly' | 'yearly'
   const [busyKey, setBusyKey] = useState(null);
 
   const TAB_CONFIG = {
-    // apiType ใช้ส่งให้ deleteQueueSummary ใน queueApi.js (รับแค่ 'day' | 'month' | 'year')
-    // stateType ใช้บอก ReportView ว่าต้องไปลบแถวออกจาก state ก้อนไหน ('daily' | 'monthly' | 'yearly')
     daily: { label: 'รายวัน', rows: daily, dateKey: 'report_date', apiType: 'day', stateType: 'daily' },
     monthly: { label: 'รายเดือน', rows: monthly, dateKey: 'report_month', apiType: 'month', stateType: 'monthly' },
     yearly: { label: 'รายปี', rows: yearly, dateKey: 'report_year', apiType: 'year', stateType: 'yearly' },
@@ -2221,7 +2144,6 @@ function ReportView() {
   const [syncMsg, setSyncMsg] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // โหลดข้อมูลรายงานจาก Supabase — ใช้ร่วมกันทั้งตอนเปิดหน้าครั้งแรกและตอนกดปุ่มรีเฟรช
   const fetchData = async ({ isInitial } = {}) => {
     if (isInitial) setLoading(true); else setRefreshing(true);
     setError('');
@@ -2264,7 +2186,6 @@ function ReportView() {
     setTimeout(() => setSyncMsg(''), 5000);
   };
 
-  // ลบแถวสรุปคิวออกจาก state ทันทีหลังลบสำเร็จใน Supabase เพื่อให้หน้าจอตรงกับฐานข้อมูลจริง
   const handleDeleted = (type, dateValue) => {
     if (type === 'daily') {
       setDaily(prev => prev.filter(r => r.report_date !== dateValue));

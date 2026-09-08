@@ -144,16 +144,83 @@ function getScanParams() {
 }
 
 // ==========================================================
+// ตัวจัดการ AudioContext แบบ "ใช้ตัวเดียวร่วมกันทั้งแอป" (singleton)
+//
+// ที่มาของปัญหาเดิม: ทุกครั้งที่จะเล่นเสียง โค้ดจะสร้าง `new AudioContext()` ใหม่
+// ทุกครั้ง (ในทุกฟังก์ชัน playBeep / playNewQueueChime / playSkipAlert) เบราว์เซอร์
+// มือถือ โดยเฉพาะ Chrome บน Android จะสร้าง AudioContext ใหม่ในสถานะ "suspended"
+// เสมอ จนกว่าจะมีการแตะ/คลิกหน้าเว็บนั้น "โดยตรง" แล้วเรียก .resume()
+//
+// ปัญหาคือเสียงเรียกคิวในแอปนี้ถูกสั่งเล่นตอนข้อมูล Realtime เปลี่ยน (มีคนกดเรียก
+// คิวจากอีกเครื่อง) ไม่ใช่จากการแตะหน้าจอนี้โดยตรง — แถมหน้าจอทีวี (DisplayView)
+// เป็นแท็บที่เปิดเป็นค่าเริ่มต้นทันทีที่ล็อกอินอัตโนมัติจาก localStorage (ไม่มีการ
+// แตะหน้าจอเลยตั้งแต่โหลดหน้า) จึงไม่มีเสียงออกเลยบนมือถือ/แท็บเล็ต Android
+//
+// วิธีแก้: ใช้ AudioContext ตัวเดียวตลอดทั้งเซสชัน (ไม่สร้างใหม่ทุกครั้ง) +
+// ฟังก์ชัน unlockAudio() ที่ต้องถูกเรียกจาก event handler ที่เกิดจากการแตะ/คลิก
+// จริงของผู้ใช้อย่างน้อย 1 ครั้ง เพื่อ resume() context ให้ค้างอยู่ในสถานะ
+// "running" ตลอดไป แล้วเสียงที่เล่นภายหลังแบบอัตโนมัติ (จาก Realtime) จะออกได้
+// ดู <SoundUnlockOverlay> ใน DisplayView และการเรียก unlockAudio() ในปุ่มต่างๆ
+// ==========================================================
+let sharedAudioCtx = null;
+let audioUnlocked = false;
+
+function getAudioContext() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return null;
+  if (!sharedAudioCtx) {
+    try { sharedAudioCtx = new AudioContextClass(); } catch (e) { return null; }
+  }
+  return sharedAudioCtx;
+}
+
+/** เรียกจากภายใน onClick/onTouchStart ที่เกิดจากการแตะของผู้ใช้จริงๆ เท่านั้น
+ *  เพื่อ "ปลดล็อก" ให้เล่นเสียง/พูดข้อความอัตโนมัติได้ตลอดเซสชันนี้ */
+function unlockAudio() {
+  const ctx = getAudioContext();
+  if (ctx && ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
+  }
+  // เล่นเสียงเบามากๆ (แทบไม่ได้ยิน) 1 ครั้งเพื่อ "อุ่นเครื่อง" ให้เบราว์เซอร์เชื่อว่า
+  // context นี้ถูกใช้งานจากการแตะจริง อนุญาตให้เล่นเสียงถัดไปแบบอัตโนมัติได้
+  if (ctx) {
+    try {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.01);
+    } catch (e) { /* no-op */ }
+  }
+  // อุ่นเครื่อง speechSynthesis ด้วย — บางเบราว์เซอร์มือถือต้องมีการ speak() ครั้งแรก
+  // ที่เกิดจากการแตะหน้าจอโดยตรงก่อน ถึงจะพูดอัตโนมัติในครั้งถัดไปได้
+  if ('speechSynthesis' in window) {
+    try {
+      const warmup = new SpeechSynthesisUtterance(' ');
+      warmup.volume = 0;
+      window.speechSynthesis.speak(warmup);
+    } catch (e) { /* no-op */ }
+  }
+  audioUnlocked = true;
+  try { window.dispatchEvent(new Event('xray-audio-unlocked')); } catch (e) { /* no-op */ }
+}
+
+// ==========================================================
 // เสียงต่างๆ ในระบบ — WebAudio ล้วนๆ ไม่ต้องมีไฟล์เสียงแนบ
 // 1) playBeep          -> เสียงเรียกคิว (ขึ้นจอทีวี / แจ้งเตือนคนไข้ที่มือถือ / เรียกซ้ำ)
 // 2) playNewQueueChime -> เสียงคิวใหม่เข้ามาในระบบ (ออกบัตร/สแกน QR สำเร็จ)
 // 3) playSkipAlert     -> เสียงเตือนเมื่อมีคิวถูกข้าม/ไม่มาแสดงตัว
+// ทั้ง 3 ฟังก์ชันนี้ใช้ AudioContext ตัวเดียวกันร่วมกัน (getAudioContext) แทนการ
+// สร้างใหม่ทุกครั้ง และพยายาม resume() ซ้ำทุกครั้งก่อนเล่น เผื่อ OS ระงับ context
+// ไว้ระหว่างที่หน้าจอไม่ได้ใช้งาน (เช่น จอทีวีเปิดค้างไว้นานๆ)
 // ==========================================================
 function playBeep() {
   try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const now = ctx.currentTime;
     const playTone = (freq, start, dur) => {
       const osc = ctx.createOscillator();
@@ -175,9 +242,9 @@ function playBeep() {
 
 function playNewQueueChime() {
   try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const now = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -195,9 +262,9 @@ function playNewQueueChime() {
 
 function playSkipAlert() {
   try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const now = ctx.currentTime;
     const playTone = (freq, start, dur) => {
       const osc = ctx.createOscillator();
@@ -250,6 +317,11 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
 function speakQueue(queueNo, counterNo) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
+  // บาง Android/Chrome จะค้าง speechSynthesis ไว้ในสถานะ paused โดยไม่ทราบสาเหตุ
+  // (มักเกิดหลังหน้าจอถูกพักหน้าจอ/สลับแอปแล้วกลับมา) ต้อง resume() ก่อนพูดทุกครั้ง
+  if (window.speechSynthesis.paused) {
+    try { window.speechSynthesis.resume(); } catch (e) { /* no-op */ }
+  }
   if (!thaiVoicePicked) pickBestThaiVoice();
   const queueNoStr = String(queueNo);
   const prefixLetter = queueNoStr.charAt(0).toUpperCase();
@@ -399,6 +471,36 @@ export default function App() {
   useEffect(() => {
     const stored = getStoredStaff();
     if (stored) setStaff(stored);
+  }, []);
+
+  // ==========================================================
+  // ปลดล็อกเสียงอัตโนมัติ (Web Audio + speechSynthesis) ทันทีที่ผู้ใช้แตะ/คลิก
+  // หน้าเว็บนี้เป็นครั้งแรก ไม่ว่าจะแตะตรงไหนก็ตาม (ปุ่มแท็บ, ปุ่มโต๊ะพนักงาน,
+  // ฟอร์มฝั่งคนไข้ ฯลฯ) — จำเป็นมากบน Android ที่บล็อกเสียงอัตโนมัติซึ่งไม่ได้เกิด
+  // จากการแตะหน้าจอโดยตรง ดู unlockAudio() ด้านบนของไฟล์
+  // ==========================================================
+  useEffect(() => {
+    if (audioUnlocked) return;
+    const handleFirstInteraction = () => { unlockAudio(); };
+    document.addEventListener('pointerdown', handleFirstInteraction, { once: true, capture: true });
+    document.addEventListener('keydown', handleFirstInteraction, { once: true, capture: true });
+    return () => {
+      document.removeEventListener('pointerdown', handleFirstInteraction, { capture: true });
+      document.removeEventListener('keydown', handleFirstInteraction, { capture: true });
+    };
+  }, []);
+
+  // เมื่อกลับมาที่แท็บ/ปลุกหน้าจอ (เช่น จอทีวี Android ล็อกหน้าจอแล้วเปิดใหม่) ให้ resume
+  // AudioContext ที่อาจถูกระบบปฏิบัติการสั่งพักไว้ระหว่างที่หน้าจอไม่ได้แสดงผล
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && audioUnlocked) {
+        const ctx = getAudioContext();
+        if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, []);
 
   // ==========================================================
@@ -1116,6 +1218,7 @@ function StaffDeskView() {
   }, [waitingQueues.length]);
 
   const run = async (fn) => {
+    unlockAudio(); // ปลดล็อกเสียงให้จอทีวีเล่นอัตโนมัติได้ตั้งแต่การคลิกปุ่มโต๊ะพนักงานครั้งแรก
     setBusy(true);
     try { await fn(); } catch (err) { console.error(err.message); alert(err.message); }
     setBusy(false);
@@ -1123,6 +1226,7 @@ function StaffDeskView() {
 
   // ต้องเปิดหน้าต่างพิมพ์แบบ synchronous ก่อน await ใดๆ ไม่งั้นเบราว์เซอร์บล็อก popup
   const runInsertAndPrint = async (queueType) => {
+    unlockAudio();
     const printWindow = window.open('', '_blank', 'width=380,height=640');
     setBusy(true);
     try {
@@ -1269,6 +1373,24 @@ function DisplayView() {
   const [dateString, setDateString] = useState('');
   const [qrToken, setQrToken] = useState(getTodayToken());
 
+  // ==========================================================
+  // สถานะ "เปิดใช้เสียงแล้วหรือยัง" — จอทีวีนี้มักถูกเปิดขึ้นอัตโนมัติจากเซสชันที่
+  // ล็อกอินค้างไว้ (localStorage) โดยไม่มีการแตะหน้าจอเลย ทำให้ Android บล็อกเสียง
+  // เรียกคิวทั้งหมด ต้องมีการ์ด "แตะเพื่อเปิดเสียง" ให้พนักงานแตะ 1 ครั้งตอนเปิดจอ
+  // ==========================================================
+  const [audioReady, setAudioReady] = useState(audioUnlocked);
+  useEffect(() => {
+    if (audioReady) return;
+    const onUnlock = () => setAudioReady(true);
+    window.addEventListener('xray-audio-unlocked', onUnlock);
+    return () => window.removeEventListener('xray-audio-unlocked', onUnlock);
+  }, [audioReady]);
+
+  const handleEnableSound = () => {
+    unlockAudio();
+    setAudioReady(true);
+  };
+
   const prevCallSignatureRef = useRef({ 1: null, 2: null });
   const prevWaitingCountRef = useRef(null);
   const prevSkippedCountRef = useRef(null);
@@ -1383,6 +1505,25 @@ function DisplayView() {
       >
         {isFullscreen ? '⤡' : '⤢'}
       </button>
+
+      {!audioReady && (
+        <div className="absolute inset-0 z-40 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center gap-4 text-center px-6">
+          <div className="w-20 h-20 rounded-full bg-emerald-500/15 border-2 border-emerald-400 text-emerald-300 flex items-center justify-center text-4xl animate-pulse">
+            🔊
+          </div>
+          <h3 className="text-2xl font-black text-white">แตะหน้าจอเพื่อเปิดเสียงเรียกคิว</h3>
+          <p className="text-sm text-white/60 max-w-md leading-relaxed">
+            เบราว์เซอร์ต้องการให้แตะหน้าจอนี้ 1 ครั้งก่อน จึงจะเล่นเสียง "บี๊บ" และเสียงพูดเรียกคิว
+            ได้อัตโนมัติเวลามีการเรียกคิวเข้ามา (ข้อจำกัดด้านความปลอดภัยของเบราว์เซอร์บนมือถือ/แท็บเล็ต)
+          </p>
+          <button
+            onClick={handleEnableSound}
+            className="mt-2 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-base px-8 py-3.5 rounded-2xl shadow-lg shadow-emerald-500/30 transition active:scale-95"
+          >
+            🔊 เปิดใช้งานเสียง
+          </button>
+        </div>
+      )}
 
       <div className="bg-white text-black py-4 px-8 flex justify-between items-center shadow-lg z-10 border-b border-gray-200">
         <div className="flex items-center gap-3">
@@ -1647,6 +1788,7 @@ function MobileQueueView() {
   };
 
   const handleSubmit = async () => {
+    unlockAudio(); // แตะปุ่มนี้ = user gesture จริง ใช้ปลดล็อกเสียง "ถึงคิว" (playBeep) ที่จะเล่นภายหลังแบบอัตโนมัติ
     const err = validateIdentifier(identifierInput);
     if (err) { setIdentifierError(err); return; }
     setIdentifierError('');

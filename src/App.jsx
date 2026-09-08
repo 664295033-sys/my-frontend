@@ -1556,16 +1556,16 @@ function DisplayView({ onExit }) {
           </div>
         </div>
 
-        <div className="flex flex-col gap-3 px-5 py-3 flex-grow items-stretch z-10 bg-gray-950 min-h-0 overflow-hidden">
-          <div className="flex-1 min-h-0 flex flex-row items-center gap-6 border-2 border-gray-800 bg-[#111827] shadow-2xl relative rounded-2xl overflow-hidden px-8">
-            <div className="bg-white p-2.5 rounded-2xl shadow-lg shrink-0">
-              <img src={qrCodeSrc} alt="QR Code สำหรับสแกนรับคิว" className="w-28 h-28 rounded" />
+        <div className="grid grid-cols-3 gap-4 px-4 py-4 flex-grow items-stretch z-10 bg-gray-950 min-h-0">
+          <div className="flex flex-col border-2 border-gray-800 bg-[#111827] shadow-2xl relative rounded-2xl overflow-hidden">
+            <div className="py-6 px-4 text-center font-black text-3xl tracking-wide text-emerald-400 border-b border-white/10 uppercase">
+              สแกนรับคิว
             </div>
-            <div className="flex-1 text-left min-w-0">
-              <div className="font-black text-3xl tracking-wide text-emerald-400 uppercase mb-1.5">
-                สแกนรับคิว
+            <div className="flex-grow flex flex-col justify-center items-center py-8 px-6 gap-4 min-h-[220px]">
+              <div className="bg-white p-3 rounded-2xl shadow-lg">
+                <img src={qrCodeSrc} alt="QR Code สำหรับสแกนรับคิว" className="w-40 h-40 sm:w-44 sm:h-44 rounded" />
               </div>
-              <p className="text-sm text-gray-400 leading-relaxed max-w-[520px]">
+              <p className="text-xs text-gray-400 text-center max-w-[220px] leading-relaxed">
                 สแกนด้วยกล้องมือถือเพื่อรับบัตรคิวดิจิทัลและติดตามคิวได้ทันที
               </p>
             </div>
@@ -1575,25 +1575,25 @@ function DisplayView({ onExit }) {
             const activeQueue = currentCalling[counterNo];
             const style = counterStyles[counterNo];
             return (
-              <div key={counterNo} className={`flex-1 min-h-0 flex flex-row items-center border-2 ${style.borderColor} ${style.bgColor} shadow-2xl transition-all duration-300 relative rounded-2xl px-8 gap-6`}>
-                <div className={`font-black text-3xl tracking-wide ${style.headerTextColor} uppercase shrink-0 w-56`}>
+              <div key={counterNo} className={`flex flex-col border-2 ${style.borderColor} ${style.bgColor} shadow-2xl transition-all duration-300 relative rounded-2xl`}>
+                <div className={`py-6 px-4 text-center font-black text-3xl tracking-wide ${style.headerTextColor} border-b border-white/10 uppercase`}>
                   ช่องที่ {counterNo}
                 </div>
-                <div className="flex-1 flex items-center justify-center min-w-0">
+                <div className="flex-grow flex flex-col justify-center items-center py-12 px-4 min-h-[220px]">
                   {activeQueue ? (
                     <div className="text-center w-full">
-                      <div className="text-7xl md:text-8xl leading-none font-black text-white tracking-tighter drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)] animate-pulse">
+                      <div className="text-8xl md:text-[110px] leading-none font-black text-white tracking-tighter drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)] animate-pulse">
                         {activeQueue.queue_no}
                       </div>
-                      <div className="mt-3 text-sm font-semibold text-white/60 tracking-widest flex items-center justify-center gap-1.5 uppercase">
+                      <div className="mt-6 text-sm font-semibold text-white/60 tracking-widest flex items-center justify-center gap-1.5 uppercase">
                         <span className="w-2.5 h-2.5 rounded-full bg-[#ccff00] animate-pulse"></span>
                         กำลังตรวจ
                       </div>
                     </div>
                   ) : (
-                    <div className="text-center opacity-30">
-                      <div className="text-5xl font-black tracking-widest text-white/50">- - -</div>
-                      <p className="mt-1.5 text-xs text-white/40 font-bold uppercase tracking-wider">ว่าง / ไม่มีคิว</p>
+                    <div className="text-center py-6 opacity-30">
+                      <div className="text-6xl font-black tracking-widest text-white/50">- - -</div>
+                      <p className="mt-2 text-xs text-white/40 font-bold uppercase tracking-wider">ว่าง / ไม่มีคิว</p>
                     </div>
                   )}
                 </div>

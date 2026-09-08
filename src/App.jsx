@@ -835,7 +835,7 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto px-4 mt-6">
         {activeTab === 2 && <StaffDeskView />}
-        {activeTab === 3 && <DisplayView />}
+        {activeTab === 3 && <DisplayView onExit={() => setActiveTab(2)} />}
         {activeTab === 6 && <ReportView />}
         {activeTab === 4 && staff.role === 'admin' && <StaffManagementView currentStaffId={staff.id} />}
       </main>
@@ -1314,7 +1314,7 @@ function StaffDeskView() {
 // ==========================================================
 // หน้าจอแสดงผล (ทีวี)
 // ==========================================================
-function DisplayView() {
+function DisplayView({ onExit }) {
   const { queues } = useRealtimeQueues();
   const displayRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -1404,6 +1404,19 @@ function DisplayView() {
     }
   };
 
+  // ==========================================================
+  // ปุ่ม "ออกจากหน้าจอทีวี" — เพราะ DisplayView เป็น fixed inset-0 z-[60] ที่ทับ
+  // เต็มหน้าจอ ทำให้แถบเมนู/แท็บด้านบนของแอปถูกบังจนกดสลับไปหน้าจออื่นไม่ได้เลย
+  // ปุ่มนี้จะออกจากโหมดเต็มจอ (ถ้ากดขยายเต็มจอไว้) แล้วค่อยเรียก onExit เพื่อสลับ
+  // กลับไปที่แท็บ "โต๊ะพนักงาน" ให้เจ้าหน้าที่ใช้งานแท็บอื่นๆ ต่อได้ตามปกติ
+  // ==========================================================
+  const handleExitDisplay = () => {
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+    if (onExit) onExit();
+  };
+
   const currentCalling = {
     1: queues.find(q => q.status === 'calling' && q.counter_no === 1) || null,
     2: queues.find(q => q.status === 'calling' && q.counter_no === 2) || null
@@ -1478,6 +1491,14 @@ function DisplayView() {
         }}
         className="relative bg-black text-white font-sans flex flex-col justify-between overflow-hidden"
       >
+        <button
+          onClick={handleExitDisplay}
+          title="ออกจากหน้าจอทีวี กลับไปหน้าอื่น"
+          className="absolute top-3 left-3 z-30 h-10 px-4 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white flex items-center gap-1.5 text-xs font-bold transition active:scale-95 border border-white/20"
+        >
+          <span className="text-base leading-none">←</span> กลับไปหน้าอื่น
+        </button>
+
         <button
           onClick={toggleFullscreen}
           title={isFullscreen ? 'ออกจากโหมดเต็มจอ' : 'ขยายเต็มจอ'}

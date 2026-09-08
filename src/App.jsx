@@ -504,6 +504,35 @@ export default function App() {
   }, []);
 
   // ==========================================================
+  // ปรับ viewport meta + reset margin/scrollbar ของ html/body/#root ให้เท่ากันทุก
+  // แพลตฟอร์ม (Windows Chrome/Edge และกล่อง Android WebView) เพื่อไม่ให้ระยะขอบ,
+  // การซูมของหน้าเว็บ หรือ scrollbar ที่ไม่เท่ากันทำให้หน้าจอทีวีดูไม่เหมือนกัน
+  // ==========================================================
+  useEffect(() => {
+    let meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'viewport');
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover');
+
+    const resetStyle = document.createElement('style');
+    resetStyle.setAttribute('data-viewport-reset', 'true');
+    resetStyle.innerHTML = `
+      html, body, #root {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        min-height: 100%;
+      }
+      html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    `;
+    document.head.appendChild(resetStyle);
+    return () => { document.head.removeChild(resetStyle); };
+  }, []);
+
+  // ==========================================================
   // ปิดการเลือก/คัดลอกข้อความทั้งเว็บ + ปิดเมนูคลิกขวา ให้ดูเป็นมืออาชีพ
   // (ยังคงพิมพ์/แก้ไขได้ปกติใน input, textarea และช่องที่ใส่ class "selectable")
   // ==========================================================
@@ -1364,6 +1393,15 @@ function StaffDeskView() {
 
 // ==========================================================
 // หน้าจอแสดงผล (ทีวี) — โลโก้, แถบประกาศวิ่ง, QR, ปุ่มเต็มจอ, ประวัติคิว, เสียงเรียกคิว/คิวเข้าใหม่/ข้ามคิว
+//
+// หมายเหตุสำคัญ: จอนี้ต้อง "เต็มขอบจอเสมอ" ไม่ว่าจะเป็นการเปิดผ่านเบราว์เซอร์บน
+// Windows หรือกล่องแอนดรอยด์ทีวี — เดิมทีตอนยังไม่ได้กด requestFullscreen() จริง
+// (ซึ่งบนกล่อง Android หลายรุ่นกด "ขยายเต็มจอ" แล้ว Fullscreen API ไม่ทำงานเพราะ
+// เว็บวิวไม่รองรับ หรือรีโมทไม่ได้สร้าง user-gesture ที่เบราว์เซอร์ยอมรับ) หน้าจอจะ
+// เหลือแค่การ์ดกลางจอที่มีขอบ/มุมโค้ง/พื้นหลังขาวรอบๆ ทำให้หน้าตาไม่เหมือนกับที่
+// ตั้งใจออกแบบไว้ (ดูภาพเทียบ Windows vs Android ที่ผู้ใช้แนบมา) จึงเปลี่ยนให้จอนี้
+// เต็มจอ (w-screen + 100dvh, ไม่มีขอบ/มุมโค้ง) อยู่เสมอโดยไม่ขึ้นกับสถานะ Fullscreen
+// API เลย ปุ่มขยายเต็มจอยังคงไว้เป็นตัวเสริมไว้ซ่อนแถบเบราว์เซอร์/แถบระบบเท่านั้น
 // ==========================================================
 function DisplayView() {
   const { queues } = useRealtimeQueues();
@@ -1413,6 +1451,16 @@ function DisplayView() {
     const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', handleFsChange);
     return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  // พยายามขอ Fullscreen API จริงให้อัตโนมัติตั้งแต่โหลดจอนี้ครั้งแรก (เผื่อกล่อง Android
+  // หรือเบราว์เซอร์รุ่นนั้นอนุญาต) แต่ไม่พึ่งพาผลลัพธ์นี้ในการจัดวางหน้าจอ (ดู containerClass
+  // ด้านล่างที่เต็มจอเสมออยู่แล้ว) — ทำเพียงเพื่อซ่อนแถบระบบ/เบราว์เซอร์เป็นโบนัสเท่านั้น
+  useEffect(() => {
+    const el = displayRef.current;
+    if (el && el.requestFullscreen) {
+      el.requestFullscreen().catch(() => { /* เบราว์เซอร์บล็อกเพราะไม่มี user-gesture ก็ไม่เป็นไร ยังเต็มจอด้วย CSS อยู่ดี */ });
+    }
   }, []);
 
   const toggleFullscreen = () => {
@@ -1495,8 +1543,8 @@ function DisplayView() {
   return (
     <div
       ref={displayRef}
-      className={`bg-black shadow-2xl flex flex-col justify-between relative overflow-hidden text-white font-sans ${isFullscreen ? 'w-screen h-screen rounded-none border-0' : 'min-h-[80vh] rounded-3xl border border-gray-800'
-        }`}
+      className="bg-black shadow-none flex flex-col justify-between relative overflow-hidden text-white font-sans w-screen rounded-none border-0 fixed inset-0 z-[60]"
+      style={{ height: '100dvh', minHeight: '100vh' }}
     >
       <button
         onClick={toggleFullscreen}

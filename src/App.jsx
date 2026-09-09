@@ -158,6 +158,49 @@ function getAudioContext() {
   return sharedAudioCtx;
 }
 
+// ==========================================================
+// เสียงเรียกคิว (พูดข้อความ) — ใช้ไฟล์เสียงจริงจาก Google Translate TTS แทนการใช้
+// Web Speech API (window.speechSynthesis) ล้วนๆ
+//
+// สาเหตุที่กล่อง Android TV ได้ยินแต่เสียงบี๊บแต่ไม่ได้ยินเสียงพูดเรียกคิว:
+// เสียงบี๊บสร้างจาก Web Audio API (oscillator) ซึ่งสังเคราะห์เสียงขึ้นมาเองในเบราว์เซอร์
+// เลยเล่นได้ทุกเครื่อง แต่เสียงพูด (speechSynthesis) ต้องพึ่ง "เสียงพูดภาษาไทย" (Thai TTS
+// voice) ที่ติดตั้งอยู่ในตัวระบบปฏิบัติการ/เบราว์เซอร์ของเครื่องนั้นๆ ซึ่งกล่อง Android TV
+// ส่วนใหญ่ไม่มีติดตั้งไว้ ผลคือเรียก speechSynthesis.speak() แล้วไม่มีเสียงออกมาเลย
+// แบบเงียบๆ โดยไม่มี error ให้เห็นด้วย (ต่างจากคอมพิวเตอร์ที่มักมีเสียงพูดไทยติดตั้งอยู่แล้ว)
+//
+// วิธีแก้: เปลี่ยนมาขอไฟล์เสียง .mp3 จากเซิร์ฟเวอร์ Google Translate TTS มาเล่นผ่าน
+// แท็ก <audio> ตรงๆ ซึ่งเป็นแค่การ "เล่นไฟล์เสียง" ธรรมดา ไม่ต้องพึ่งเสียงพูดที่ติดตั้ง
+// อยู่ในเครื่องเลย จึงเล่นได้เหมือนกันทุกอุปกรณ์ทั้งคอมพิวเตอร์และกล่อง Android TV
+// (ข้อควรทราบ: endpoint นี้เป็นบริการฟรีที่ไม่เป็นทางการของ Google ต้องมีอินเทอร์เน็ต
+// ออกไปยัง translate.google.com ได้ ถ้าเครือข่ายกล่อง Android TV เป็นวงในไม่ออกเน็ต
+// ภายนอกเลย จะเล่นเสียงนี้ไม่ได้ และถ้าอนาคตใช้งานหนักมากจน Google บล็อก IP ก็อาจ
+// ต้องเปลี่ยนไปใช้บริการ TTS แบบมี API key เช่น ResponsiveVoice/Google Cloud TTS แทน)
+// ==========================================================
+let sharedTtsAudio = null;
+function getSharedTtsAudio() {
+  if (!sharedTtsAudio) {
+    sharedTtsAudio = new Audio();
+    sharedTtsAudio.preload = 'auto';
+  }
+  return sharedTtsAudio;
+}
+
+// ไฟล์เสียงเงียบสั้นๆ (data URI) ใช้ "ปลดล็อก" การเล่นเสียงอัตโนมัติของแท็ก <audio>
+// บนเบราว์เซอร์ที่บล็อก autoplay จนกว่าจะมีการแตะหน้าจอของผู้ใช้ก่อนอย่างน้อย 1 ครั้ง
+const SILENT_AUDIO_DATA_URI =
+  'data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgID/+xDEAAPAAAGkAAAAIAAANIAAAAQTEFN';
+
+function unlockTtsAudio() {
+  try {
+    const audio = getSharedTtsAudio();
+    audio.src = SILENT_AUDIO_DATA_URI;
+    audio.volume = 0;
+    const p = audio.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch (e) { /* no-op */ }
+}
+
 /** เรียกจากภายใน onClick/onTouchStart ที่เกิดจากการแตะของผู้ใช้จริงๆ เท่านั้น
  *  เพื่อ "ปลดล็อก" ให้เล่นเสียง/พูดข้อความอัตโนมัติได้ตลอดเซสชันนี้ */
 function unlockAudio() {
@@ -176,6 +219,7 @@ function unlockAudio() {
       osc.stop(ctx.currentTime + 0.01);
     } catch (e) { /* no-op */ }
   }
+  unlockTtsAudio();
   if ('speechSynthesis' in window) {
     try {
       const warmup = new SpeechSynthesisUtterance(' ');
@@ -280,18 +324,24 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
   window.speechSynthesis.addEventListener('voiceschanged', pickBestThaiVoice);
 }
 
-function speakQueue(queueNo, counterNo) {
+function buildQueueSpeechText(queueNo, counterNo) {
+  const queueNoStr = String(queueNo);
+  const prefixLetter = queueNoStr.charAt(0).toUpperCase();
+  const prefixReading = PREFIX_READING[prefixLetter] || prefixLetter;
+  const digits = queueNoStr.slice(1).split('').join(' ');
+  return `ขอเชิญหมายเลข ${prefixReading} ${digits} ที่ช่องบริการที่ ${counterNo}`;
+}
+
+// ตัวสำรอง (fallback) — ใช้ Web Speech API ของเครื่อง ใช้ในกรณีที่โหลดไฟล์เสียงจาก
+// อินเทอร์เน็ตไม่สำเร็จเท่านั้น (ถ้าเครื่องนั้นไม่มี Thai TTS ติดตั้งไว้ก็จะไม่มีเสียงอยู่ดี
+// แต่ก็ยังลองไว้เผื่อกรณีอื่นๆ)
+function speakQueueViaWebSpeech(text) {
   if (!('speechSynthesis' in window)) return;
   window.speechSynthesis.cancel();
   if (window.speechSynthesis.paused) {
     try { window.speechSynthesis.resume(); } catch (e) { /* no-op */ }
   }
   if (!thaiVoicePicked) pickBestThaiVoice();
-  const queueNoStr = String(queueNo);
-  const prefixLetter = queueNoStr.charAt(0).toUpperCase();
-  const prefixReading = PREFIX_READING[prefixLetter] || prefixLetter;
-  const digits = queueNoStr.slice(1).split('').join(' ');
-  const text = `ขอเชิญหมายเลข, ${prefixReading}, ${digits}, ที่ช่องบริการที่ ${counterNo}`;
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'th-TH';
   utterance.rate = 0.62;
@@ -299,6 +349,32 @@ function speakQueue(queueNo, counterNo) {
   utterance.volume = 1;
   if (cachedThaiVoice) utterance.voice = cachedThaiVoice;
   window.speechSynthesis.speak(utterance);
+}
+
+// เล่นเสียงเรียกคิว — ดึงไฟล์เสียงจริงจาก Google Translate TTS มาเล่นเป็นหลัก เพราะไม่
+// ต้องพึ่งเสียงพูดที่ติดตั้งอยู่ในเครื่อง (ดูคำอธิบายละเอียดด้านบนของฟังก์ชัน unlockAudio)
+// ถ้าโหลด/เล่นไฟล์เสียงไม่สำเร็จ (เช่น อินเทอร์เน็ตหลุดชั่วขณะ) จะ fallback ไปใช้
+// speechSynthesis ของเครื่องแทนโดยอัตโนมัติ
+function speakQueue(queueNo, counterNo) {
+  const text = buildQueueSpeechText(queueNo, counterNo);
+  const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=th&q=${encodeURIComponent(text)}`;
+
+  try {
+    const audio = getSharedTtsAudio();
+    audio.pause();
+    audio.currentTime = 0;
+    audio.volume = 1;
+    audio.src = ttsUrl;
+    const playPromise = audio.play();
+    if (playPromise && playPromise.catch) {
+      playPromise.catch((err) => {
+        console.error('เล่นไฟล์เสียงเรียกคิวจากอินเทอร์เน็ตไม่สำเร็จ ลอง fallback เป็นเสียงพูดของเครื่องแทน:', err);
+        speakQueueViaWebSpeech(text);
+      });
+    }
+  } catch (e) {
+    speakQueueViaWebSpeech(text);
+  }
 }
 
 let html2canvasLoadingPromise = null;

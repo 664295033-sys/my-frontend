@@ -23,6 +23,42 @@ const HOSPITAL_LOGO_GREEN_SRC = "https://cdn.phototourl.com/free/2026-09-03-1272
 // ==========================================================
 const STAFF_LOGIN_BG_SRC = "https://cdn.phototourl.com/free/2026-09-03-43a6baa9-02e5-4b52-b0a0-50207926f7ce.jpg";
 
+// ==========================================================
+// URL หลักของเว็บแอปนี้แบบสาธารณะ (Public URL) — ใช้สร้างลิงก์ QR Code ให้คนไข้สแกน
+// รับคิวจากมือถือ ต้องตั้งเป็น URL จริงที่เข้าถึงได้จากอินเทอร์เน็ตทั่วไป (ทั้ง WiFi
+// โรงพยาบาลและเน็ตมือถือ 4G/5G) เช่น URL หลังจาก deploy ขึ้น Vercel/Netlify หรือ
+// โดเมนของโรงพยาบาลเอง และต้องเป็น https:// เท่านั้น (มือถือส่วนใหญ่ไม่ยอมเปิด http://)
+//
+// ตัวอย่าง: const PUBLIC_APP_BASE_URL = 'https://xray-queue.songkhlahospital.go.th';
+//
+// ถ้าปล่อยว่างไว้ (ค่าเริ่มต้น) ระบบจะ fallback ไปใช้ที่อยู่ปัจจุบันของเบราว์เซอร์ที่เปิด
+// หน้าจอทีวีอยู่ (window.location.origin) ซึ่งเป็นสาเหตุที่พบบ่อยที่สุดของอาการ "สแกนแล้ว
+// เข้าไม่ได้ / Safari ขึ้นเซิร์ฟเวอร์หยุดการโต้ตอบ" เมื่อสแกนจากเน็ตมือถือ 4G/5G:
+// ถ้าหน้าจอทีวีเปิดผ่านที่อยู่ IP วงในของโรงพยาบาล (เช่น http://192.168.x.x:3000)
+// หรือ localhost ที่อยู่แบบนั้นจะเข้าถึงได้เฉพาะเครื่องที่อยู่ในเครือข่ายเดียวกันเท่านั้น
+// มือถือที่ใช้เน็ต 4G/5G (ไม่ได้ต่อ WiFi โรงพยาบาล) จะต่อเข้าไม่ได้เด็ดขาด แม้แต่เครื่องที่
+// ต่อ WiFi โรงพยาบาลอยู่ก็อาจเข้าไม่ได้ด้วยถ้า IP นั้นเปลี่ยนไปหรือไฟร์วอลล์กั้นไว้
+// วิธีแก้ถาวรคือต้อง deploy แอปนี้ขึ้นที่อยู่สาธารณะแล้วใส่ URL นั้นไว้ตรงนี้
+// ==========================================================
+const PUBLIC_APP_BASE_URL = '';
+
+// ตรวจว่า URL ที่จะใช้สร้าง QR Code เป็นที่อยู่วงในหรือ localhost หรือไม่ (เข้าจาก
+// เน็ตมือถือภายนอกไม่ได้แน่นอน) เพื่อเตือนเจ้าหน้าที่ให้เห็นชัดๆ บนจอทีวีเลย แทนที่จะ
+// รู้ตัวอีกทีตอนคนไข้สแกนแล้วเข้าไม่ได้
+function isLikelyUnreachableFromMobileData(url) {
+  try {
+    const { hostname, protocol } = new URL(url);
+    if (protocol !== 'https:') return true;
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.local')) return true;
+    if (/^10\./.test(hostname)) return true;
+    if (/^192\.168\./.test(hostname)) return true;
+    if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)) return true;
+    return false;
+  } catch (e) {
+    return true;
+  }
+}
+
 // ไอคอนฟิล์มเอกซเรย์แบบมินิมอล — ใช้เป็น badge ทับมุมโลโก้ในหน้าจอมือถือคนไข้
 function XRayIcon({ size = 24, className = "" }) {
   return (
@@ -1542,9 +1578,10 @@ function DisplayView({ onExit }) {
     ? `คิวที่ข้ามหรือเรียกแล้วไม่แสดงตัว: ${skippedQueues.map(q => q.queue_no).join(', ')} (กรุณาสแกน QR Code เพื่อรับคิวใหม่ค่ะ)`
     : 'ขณะนี้ไม่มีคิวที่ถูกข้ามหรือตกหล่นในระบบ';
 
-  const scanBaseUrl = window.location.origin + window.location.pathname;
+  const scanBaseUrl = PUBLIC_APP_BASE_URL || (window.location.origin + window.location.pathname);
   const scanUrl = buildScanUrl(scanBaseUrl, qrToken);
   const qrCodeSrc = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(scanUrl)}`;
+  const scanUrlLooksUnreachable = isLikelyUnreachableFromMobileData(scanBaseUrl);
 
   const counterStyles = {
     1: { bgColor: 'bg-[#10309c]', borderColor: 'border-[#1b43c4]', headerTextColor: 'text-[#ffd700]' },
@@ -1644,6 +1681,11 @@ function DisplayView({ onExit }) {
               <p className="text-xs text-gray-400 text-center max-w-[220px] leading-relaxed">
                 สแกนด้วยกล้องมือถือเพื่อรับบัตรคิวดิจิทัลและติดตามคิวได้ทันที
               </p>
+              {scanUrlLooksUnreachable && (
+                <p className="text-[10px] text-amber-400 text-center max-w-[240px] leading-relaxed bg-amber-950/40 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
+                  ⚠️ ลิงก์ QR นี้อาจใช้สแกนจากเน็ตมือถือ 4G/5G ไม่ได้ (ยังไม่ได้ตั้งค่า PUBLIC_APP_BASE_URL เป็น URL สาธารณะ)
+                </p>
+              )}
             </div>
           </div>
 

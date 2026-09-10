@@ -1620,25 +1620,6 @@ function DisplayView({ onExit }) {
           {isFullscreen ? '⤡' : '⤢'}
         </button>
 
-        {!audioReady && (
-          <div className="absolute inset-0 z-40 bg-black/85 backdrop-blur-sm flex flex-col items-center justify-center gap-4 text-center px-6">
-            <div className="w-20 h-20 rounded-full bg-emerald-500/15 border-2 border-emerald-400 text-emerald-300 flex items-center justify-center text-4xl animate-pulse">
-              🔊
-            </div>
-            <h3 className="text-2xl font-black text-white">แตะหน้าจอเพื่อเปิดเสียงเรียกคิว</h3>
-            <p className="text-sm text-white/60 max-w-md leading-relaxed">
-              เบราว์เซอร์ต้องการให้แตะหน้าจอนี้ 1 ครั้งก่อน จึงจะเล่นเสียง "บี๊บ" และเสียงพูดเรียกคิว
-              ได้อัตโนมัติเวลามีการเรียกคิวเข้ามา (ข้อจำกัดด้านความปลอดภัยของเบราว์เซอร์บนมือถือ/แท็บเล็ต)
-            </p>
-            <button
-              onClick={handleEnableSound}
-              className="mt-2 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-base px-8 py-3.5 rounded-2xl shadow-lg shadow-emerald-500/30 transition active:scale-95"
-            >
-              🔊 เปิดใช้งานเสียง
-            </button>
-          </div>
-        )}
-
         <div className="bg-white text-black py-4 px-8 flex justify-between items-center shadow-lg z-10 border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-[#0e8345] rounded-full flex items-center justify-center text-white font-black text-xl shadow-md border-2 border-emerald-100">X</div>

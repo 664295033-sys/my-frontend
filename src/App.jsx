@@ -1477,6 +1477,9 @@ function DisplayView({ onExit }) {
   const prevCallSignatureRef = useRef({ 1: null, 2: null });
   const prevWaitingCountRef = useRef(null);
   const prevSkippedCountRef = useRef(null);
+  // กันไม่ให้เล่นเสียงอ่านคิวตอนพนักงาน "เพิ่งเปิด" หน้าจอทีวีขึ้นมาแล้วดันมีคิวค้างอยู่ในสถานะ
+  // "กำลังเรียก" อยู่ก่อนแล้ว — ต้องการให้เสียงอ่านคิวดังเฉพาะตอนพนักงานกด "เรียกคิวถัดไป" เองเท่านั้น
+  const isFirstCallCheckRef = useRef(true);
 
   useEffect(() => {
     const clockTimer = setInterval(() => {
@@ -1538,6 +1541,7 @@ function DisplayView({ onExit }) {
   const skippedQueues = queues.filter(q => q.status === 'skipped');
 
   useEffect(() => {
+    const isFirstCheck = isFirstCallCheckRef.current;
     COUNTERS.forEach(c => {
       const current = currentCalling[c];
       if (!current) {
@@ -1545,12 +1549,16 @@ function DisplayView({ onExit }) {
         return;
       }
       const signature = `${current.id}|${current.called_at || ''}`;
-      if (signature !== prevCallSignatureRef.current[c]) {
+      // ครั้งแรกที่เปิดหน้าจอทีวี แค่บันทึกสถานะปัจจุบันไว้เฉยๆ ไม่เล่นเสียง แม้จะมีคิวที่
+      // "กำลังเรียก" ค้างอยู่ก่อนแล้วก็ตาม — เสียงจะดังเฉพาะตอนสถานะเปลี่ยนจริงๆ หลังจากนี้
+      // (คือตอนพนักงานกดเรียกคิว/เรียกซ้ำเอง)
+      if (!isFirstCheck && signature !== prevCallSignatureRef.current[c]) {
         playBeep();
         speakQueue(current.queue_no, c);
       }
       prevCallSignatureRef.current[c] = signature;
     });
+    isFirstCallCheckRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentCalling[1]?.id, currentCalling[1]?.called_at, currentCalling[2]?.id, currentCalling[2]?.called_at]);
 

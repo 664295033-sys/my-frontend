@@ -1474,12 +1474,18 @@ function DisplayView({ onExit }) {
     setAudioReady(true);
   };
 
-  const prevCallSignatureRef = useRef({ 1: null, 2: null });
+  const prevCallSignatureRef = useRef({ 1: undefined, 2: undefined });
   const prevWaitingCountRef = useRef(null);
   const prevSkippedCountRef = useRef(null);
-  // กันไม่ให้เล่นเสียงอ่านคิวตอนพนักงาน "เพิ่งเปิด" หน้าจอทีวีขึ้นมาแล้วดันมีคิวค้างอยู่ในสถานะ
-  // "กำลังเรียก" อยู่ก่อนแล้ว — ต้องการให้เสียงอ่านคิวดังเฉพาะตอนพนักงานกด "เรียกคิวถัดไป" เองเท่านั้น
-  const isFirstCallCheckRef = useRef(true);
+  // ข้อมูลคิวจาก Supabase realtime อาจทยอยโหลดมาถึงเป็นหลายรอบ (รอบแรกว่างเปล่า รอบถัดมา
+  // ถึงมีข้อมูลจริง) ทำให้เช็ค "ครั้งแรกที่ effect รัน" เพียงอย่างเดียวไม่พอ — เลยกันไว้อีกชั้น
+  // ด้วยการหน่วงเวลาสั้นๆ หลังเปิดหน้าจอทีวี ในช่วงนี้จะไม่เล่นเสียงอ่านคิวเลยไม่ว่าข้อมูลจะ
+  // เปลี่ยนกี่รอบก็ตาม พอพ้นช่วงนี้ไปแล้วถึงจะเริ่มเล่นเสียงตอนมีการเรียกคิวจริงๆ
+  const readyToAnnounceRef = useRef(false);
+  useEffect(() => {
+    const t = setTimeout(() => { readyToAnnounceRef.current = true; }, 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     const clockTimer = setInterval(() => {
@@ -1541,24 +1547,21 @@ function DisplayView({ onExit }) {
   const skippedQueues = queues.filter(q => q.status === 'skipped');
 
   useEffect(() => {
-    const isFirstCheck = isFirstCallCheckRef.current;
     COUNTERS.forEach(c => {
       const current = currentCalling[c];
-      if (!current) {
-        prevCallSignatureRef.current[c] = null;
-        return;
-      }
-      const signature = `${current.id}|${current.called_at || ''}`;
-      // ครั้งแรกที่เปิดหน้าจอทีวี แค่บันทึกสถานะปัจจุบันไว้เฉยๆ ไม่เล่นเสียง แม้จะมีคิวที่
-      // "กำลังเรียก" ค้างอยู่ก่อนแล้วก็ตาม — เสียงจะดังเฉพาะตอนสถานะเปลี่ยนจริงๆ หลังจากนี้
-      // (คือตอนพนักงานกดเรียกคิว/เรียกซ้ำเอง)
-      if (!isFirstCheck && signature !== prevCallSignatureRef.current[c]) {
+      const signature = current ? `${current.id}|${current.called_at || ''}` : null;
+      const prev = prevCallSignatureRef.current[c];
+      // ค่า undefined หมายถึง "ยังไม่เคยเห็นข้อมูลของช่องนี้เลยตั้งแต่เปิดหน้าจอทีวีมา"
+      // (ไม่ว่าจะเป็นเพราะเพิ่งเปิดหน้าจอ หรือข้อมูล realtime จาก Supabase ยังโหลดมาไม่ถึง
+      // ในตอนนั้น) — ค่าที่เห็นครั้งแรกไม่ว่าจะเป็นอะไรก็ตาม ให้ถือเป็น "ค่าเริ่มต้น" เฉยๆ
+      // ไม่เล่นเสียง เสียงจะดังเฉพาะตอนค่าเปลี่ยนไปจากที่เคยเห็นแล้วเท่านั้น (คือตอนพนักงาน
+      // กดเรียกคิว/เรียกซ้ำเองในภายหลัง)
+      if (readyToAnnounceRef.current && prev !== undefined && signature !== null && signature !== prev) {
         playBeep();
         speakQueue(current.queue_no, c);
       }
       prevCallSignatureRef.current[c] = signature;
     });
-    isFirstCallCheckRef.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentCalling[1]?.id, currentCalling[1]?.called_at, currentCalling[2]?.id, currentCalling[2]?.called_at]);
 

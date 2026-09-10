@@ -364,8 +364,10 @@ function buildQueueSpeechText(queueNo, counterNo) {
   const queueNoStr = String(queueNo);
   const prefixLetter = queueNoStr.charAt(0).toUpperCase();
   const prefixReading = PREFIX_READING[prefixLetter] || prefixLetter;
-  const digits = queueNoStr.slice(1).split('').join(' ');
-  return `ขอเชิญหมายเลข ${prefixReading} ${digits} ที่ช่องบริการที่ ${counterNo}`;
+  // ใส่ , ระหว่างตัวเลขแต่ละหลัก เพื่อบังคับให้ TTS พักหายใจระหว่างพูดแต่ละหลัก
+  // ไม่ให้พูดรวดเดียวจนฟังไม่ทันว่าเป็นเลขอะไร
+  const digits = queueNoStr.slice(1).split('').join(', ');
+  return `ขอเชิญหมายเลข ${prefixReading}, ${digits}, ที่ช่องบริการที่ ${counterNo}`;
 }
 
 // ตัวสำรอง (fallback) — ใช้ Web Speech API ของเครื่อง ใช้ในกรณีที่โหลดไฟล์เสียงจาก
@@ -400,6 +402,13 @@ function speakQueue(queueNo, counterNo) {
     audio.pause();
     audio.currentTime = 0;
     audio.volume = 1;
+    // ลดความเร็วเล่นเสียงลงให้พูดช้าลงและฟังชัดขึ้น (0.8 = ช้าลง 20%)
+    // ปรับตัวเลขนี้ได้ตามใจ ยิ่งน้อยยิ่งช้า (แนะนำช่วง 0.75–0.9)
+    audio.playbackRate = 0.8;
+    // บอกเบราว์เซอร์ให้คง pitch เดิมไว้ตอนเล่นช้าลง ไม่ให้เสียงต่ำ/อู้อี้
+    audio.preservesPitch = true;
+    audio.mozPreservesPitch = true;
+    audio.webkitPreservesPitch = true;
     audio.src = ttsUrl;
     const playPromise = audio.play();
     if (playPromise && playPromise.catch) {
@@ -412,7 +421,6 @@ function speakQueue(queueNo, counterNo) {
     speakQueueViaWebSpeech(text);
   }
 }
-
 let html2canvasLoadingPromise = null;
 function loadHtml2Canvas() {
   if (window.html2canvas) return Promise.resolve(window.html2canvas);

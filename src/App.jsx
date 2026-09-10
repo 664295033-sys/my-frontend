@@ -401,10 +401,10 @@ function speakQueue(queueNo, counterNo) {
     const audio = getSharedTtsAudio();
     audio.pause();
     audio.currentTime = 0;
-    audio.volume = 1;
+    audio.volume = 2;
     // ลดความเร็วเล่นเสียงลงให้พูดช้าลงและฟังชัดขึ้น (0.8 = ช้าลง 20%)
     // ปรับตัวเลขนี้ได้ตามใจ ยิ่งน้อยยิ่งช้า (แนะนำช่วง 0.75–0.9)
-    audio.playbackRate = 2.0;
+    audio.playbackRate = 2.5;
     // บอกเบราว์เซอร์ให้คง pitch เดิมไว้ตอนเล่นช้าลง ไม่ให้เสียงต่ำ/อู้อี้
     audio.preservesPitch = true;
     audio.mozPreservesPitch = true;

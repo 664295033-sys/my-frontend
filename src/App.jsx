@@ -1623,14 +1623,6 @@ function DisplayView({ onExit }) {
         }}
         className="relative bg-black text-white font-sans flex flex-col justify-between overflow-hidden"
       >
-        <button
-          onClick={toggleFullscreen}
-          title={isFullscreen ? 'ออกจากโหมดเต็มจอ' : 'ขยายเต็มจอ'}
-          className="absolute top-3 right-3 z-30 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white flex items-center justify-center transition active:scale-95 border border-white/20"
-        >
-          {isFullscreen ? '⤡' : '⤢'}
-        </button>
-
         <div className="bg-white text-black py-4 px-8 flex justify-between items-center shadow-lg z-10 border-b border-gray-200 shrink-0">
           <div className="flex items-center gap-3">
             <button
@@ -1649,9 +1641,13 @@ function DisplayView({ onExit }) {
             <h2 className="text-3xl font-black text-[#10309c] tracking-wide">หมายเลขเรียกเอกซเรย์</h2>
             <p className="text-xs font-semibold text-gray-500 mt-1">{dateString} • {timeString}</p>
           </div>
-          <div className="w-16 h-16 rounded-full flex items-center justify-center shrink-0 bg-emerald-50 border-2 border-emerald-200 text-emerald-600 font-black text-2xl">
+          <button
+            onClick={toggleFullscreen}
+            title={isFullscreen ? 'ออกจากโหมดเต็มจอ' : 'ขยายเต็มจอ'}
+            className="w-16 h-16 rounded-full flex items-center justify-center shrink-0 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 text-emerald-600 font-black text-2xl transition active:scale-95"
+          >
             SKH
-          </div>
+          </button>
         </div>
 
         <div className="bg-[#102d94] text-white py-3 px-6 border-b border-blue-900 z-10 flex items-center gap-4 overflow-hidden relative shadow-inner w-full shrink-0">

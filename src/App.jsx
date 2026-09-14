@@ -1628,7 +1628,7 @@ function DisplayView({ onExit }) {
           title="ออกจากหน้าจอทีวี กลับไปหน้าอื่น"
           className="absolute top-3 left-3 z-30 h-10 px-4 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white flex items-center gap-1.5 text-xs font-bold transition active:scale-95 border border-white/20"
         >
-          <span className="text-base leading-none">←</span> กลับไปหน้าอื่น
+          <span className="text-base leading-none">←</span> ย้อนกลับ
         </button>
 
         <button

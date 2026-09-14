@@ -1638,8 +1638,8 @@ function DisplayView({ onExit }) {
             </div>
           </div>
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-            <h2 className="text-3xl font-black text-[#10309c] tracking-wide">หมายเลขเรียกคิวซักประวัติ X-Ray</h2>
-            <p className="text-xs font-semibold text-gray-500 mt-1">{dateString} • {timeString}</p>
+            <h2 className="text-3xl font-black text-[#10309c] tracking-wide">หมายเลขเรียกเอกซเรย์</h2>
+            <p className="text-lg font-bold text-gray-600 mt-1.5">{dateString} • {timeString}</p>
           </div>
           <button
             onClick={toggleFullscreen}

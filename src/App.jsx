@@ -1623,7 +1623,7 @@ function DisplayView({ onExit }) {
         }}
         className="relative bg-black text-white font-sans flex flex-col justify-between overflow-hidden"
       >
-        <div className="bg-white text-black py-4 px-8 flex justify-between items-center shadow-lg z-10 border-b border-gray-200 shrink-0">
+        <div className="bg-white text-black py-4 px-8 flex justify-between items-center shadow-lg z-10 border-b border-gray-200 shrink-0 relative">
           <div className="flex items-center gap-3">
             <button
               onClick={handleExitDisplay}
@@ -1637,7 +1637,7 @@ function DisplayView({ onExit }) {
               <span className="text-[10px] text-gray-400 block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
             </div>
           </div>
-          <div className="text-center flex-grow">
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
             <h2 className="text-3xl font-black text-[#10309c] tracking-wide">หมายเลขเรียกเอกซเรย์</h2>
             <p className="text-xs font-semibold text-gray-500 mt-1">{dateString} • {timeString}</p>
           </div>

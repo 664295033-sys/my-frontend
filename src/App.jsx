@@ -515,83 +515,6 @@ function resizeImageToDataUrl(file, maxSize = 200, quality = 0.7) {
   });
 }
 
-// ==========================================================
-// ปริ้นบัตรคิวอัตโนมัติสำหรับ "คิวที่คนไข้สแกน QR รับจากมือถือ" — ไม่ต้องรอเจ้าหน้าที่กดปริ้นเอง
-//
-// ใช้ <iframe> ที่ซ่อนไว้ (ไม่ใช่ window.open หน้าต่างใหม่แบบปุ่มปริ้นบัตรกระดาษปกติ) เพราะ
-// iframe เป็นแค่ element ที่แปะอยู่ในหน้าเว็บเดิม ไม่ใช่การเปิดหน้าต่าง/แท็บใหม่ จึงไม่โดน
-// popup blocker ของเบราว์เซอร์บล็อก และไม่จำเป็นต้องมีการคลิกของผู้ใช้ (user gesture) ก่อน
-// เหมือน window.open ทำให้สั่งปริ้นอัตโนมัติได้ทันทีตอนมีคิวใหม่เข้ามาจริงๆ โดยไม่ต้องมีใคร
-// กดปุ่มอะไรเลย ตราบใดที่เครื่องที่รันหน้าจอนี้ต่อกับเครื่องพิมพ์ (เช่น Epson TM series ใน
-// รูปที่แนบมา) ไว้เป็นเครื่องพิมพ์เริ่มต้น กล่องโต้ตอบยืนยันการพิมพ์ของเบราว์เซอร์จะเด้งขึ้นมา
-// ให้กด "พิมพ์" เอง เว้นแต่เบราว์เซอร์นั้นเปิดโหมด kiosk printing ไว้ (เช่น Chrome รันด้วย
-// flag --kiosk-printing) ซึ่งจะพิมพ์ออกเครื่องพิมพ์เริ่มต้นทันทีแบบไม่มีกล่องโต้ตอบเด้งขึ้นเลย
-// ==========================================================
-function autoPrintMobileQueueTicket(queue) {
-  const iframe = document.createElement('iframe');
-  iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.style.border = '0';
-  iframe.setAttribute('aria-hidden', 'true');
-  document.body.appendChild(iframe);
-  try {
-    printQueueTicket(queue, iframe.contentWindow);
-  } catch (err) {
-    console.error('ปริ้นบัตรคิวจากมือถืออัตโนมัติไม่สำเร็จ:', err);
-  }
-  // ลบ iframe ทิ้งภายหลัง เผื่อเวลาให้กล่องโต้ตอบปริ้นของเบราว์เซอร์ทำงานจนเสร็จก่อน
-  setTimeout(() => {
-    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-  }, 8000);
-}
-
-// เปิด/ปิดฟีเจอร์ปริ้นอัตโนมัติได้จากปุ่มในหน้าโต๊ะพนักงาน (ค่าเริ่มต้นคือ "เปิด")
-// เก็บค่าไว้ใน localStorage ของเครื่องนั้นๆ เพื่อให้จำค่าไว้ข้ามการรีเฟรชหน้าเว็บ
-const AUTO_PRINT_MOBILE_KEY = 'xray_auto_print_mobile_queue';
-function isAutoPrintMobileEnabledFromStorage() {
-  try { return localStorage.getItem(AUTO_PRINT_MOBILE_KEY) !== '0'; } catch (e) { return true; }
-}
-function setAutoPrintMobileEnabledInStorage(v) {
-  try { localStorage.setItem(AUTO_PRINT_MOBILE_KEY, v ? '1' : '0'); } catch (e) { /* no-op */ }
-}
-
-// เก็บ id ของคิวมือถือที่ "เคยเห็นแล้ว" ไว้ระดับ module (อยู่นอก component) เพื่อให้ข้อมูลนี้
-// ไม่หายไปตอนสลับแท็บแล้ว component ถูก mount ใหม่ — กันไม่ให้ปริ้นบัตรใบเดิมซ้ำอีกรอบ
-const seenMobileQueueIds = new Set();
-
-// ==========================================================
-// คอมโพเนนต์เบื้องหลัง (ไม่แสดงผล UI ใดๆ) คอยเฝ้าดูข้อมูลคิว realtime อยู่ตลอดเวลา ไม่ว่าจะ
-// สลับไปแท็บไหนของแอปอยู่ก็ตาม (mount ไว้ที่ระดับ App เลย ไม่ผูกกับแท็บใดแท็บหนึ่ง) เพื่อสั่ง
-// ปริ้นบัตรคิวอัตโนมัติทันทีที่มีคนไข้สแกน QR รับคิวจากมือถือเข้ามาใหม่
-// ==========================================================
-function AutoPrintMobileQueueWatcher() {
-  const { queues } = useRealtimeQueues();
-  const baselineSeededRef = useRef(false);
-
-  useEffect(() => {
-    // รอบแรกที่ข้อมูลโหลดมาถึง ให้ถือว่าคิวมือถือที่ "รอ" อยู่ก่อนแล้วเป็นของเก่า (ปริ้นไปแล้ว
-    // ตั้งแต่ตอนคนไข้สแกนตอนแรก หรือเจ้าหน้าที่เพิ่งมาเปิด/รีเฟรชหน้านี้) ไม่ต้องปริ้นซ้ำ
-    if (!baselineSeededRef.current) {
-      queues.forEach(q => { if (q.source === 'mobile') seenMobileQueueIds.add(q.id); });
-      baselineSeededRef.current = true;
-      return;
-    }
-    if (!isAutoPrintMobileEnabledFromStorage()) return;
-    queues
-      .filter(q => q.source === 'mobile' && q.status === 'waiting' && !seenMobileQueueIds.has(q.id))
-      .forEach(q => {
-        seenMobileQueueIds.add(q.id);
-        autoPrintMobileQueueTicket(q);
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queues]);
-
-  return null;
-}
-
 export default function App() {
   const [activeTab, setActiveTab] = useState(3); // 1 login, 2 desk, 3 display, 4 staff mgmt
   const [staff, setStaff] = useState(null);
@@ -847,7 +770,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-emerald-50/60 font-sans text-gray-900 pb-12">
-      <AutoPrintMobileQueueWatcher />
       <header className="bg-white shadow-sm border-b border-emerald-100 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
           <h1 className="text-2xl font-bold tracking-tight text-emerald-600">Queue<span className="text-gray-800">System</span></h1>
@@ -1329,8 +1251,6 @@ function LoginView({ onLoggedIn }) {
 
 // ==========================================================
 // หน้าโต๊ะพนักงาน — มีปุ่ม "เรียกซ้ำ" + ปริ้นบัตรคิวทันทีที่ออกบัตร OPD/IPD/ER
-// + สวิตช์เปิด/ปิดการ "ปริ้นบัตรคิวจากมือถืออัตโนมัติ" (ดูฟังก์ชัน autoPrintMobileQueueTicket
-// และคอมโพเนนต์ AutoPrintMobileQueueWatcher ด้านบนของไฟล์นี้ ที่เป็นตัวสั่งปริ้นจริง)
 // ==========================================================
 function StaffDeskView() {
   const { queues } = useRealtimeQueues();
@@ -1347,14 +1267,6 @@ function StaffDeskView() {
   const [callTypeFilter, setCallTypeFilter] = useState('all');
   const [busy, setBusy] = useState(false);
   const prevWaitingCountRef = useRef(null);
-
-  // สวิตช์เปิด/ปิดปริ้นบัตรคิวจากมือถืออัตโนมัติ (ค่าเริ่มต้น "เปิด" อยู่แล้ว)
-  const [autoPrintMobileOn, setAutoPrintMobileOn] = useState(() => isAutoPrintMobileEnabledFromStorage());
-  const handleToggleAutoPrintMobile = () => {
-    const next = !autoPrintMobileOn;
-    setAutoPrintMobileOn(next);
-    setAutoPrintMobileEnabledInStorage(next);
-  };
 
   const handleSaveCounter = () => {
     try { localStorage.setItem(COUNTER_LOCK_KEY, String(selectedCounter)); } catch (e) { /* no-op */ }
@@ -1419,21 +1331,7 @@ function StaffDeskView() {
             );
           })}
         </div>
-        <div className="ml-auto flex items-center gap-1.5">
-          <button
-            onClick={handleToggleAutoPrintMobile}
-            title={autoPrintMobileOn
-              ? 'ปิดการปริ้นบัตรคิวจากมือถืออัตโนมัติ'
-              : 'เปิดการปริ้นบัตรคิวจากมือถืออัตโนมัติ (คิวที่คนไข้สแกน QR รับคิวจากมือถือ จะปริ้นบัตรออกมาเองทันทีที่รับคิว โดยไม่ต้องกดปริ้นเอง)'}
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border transition ${autoPrintMobileOn
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
-              : 'bg-gray-100 border-gray-200 text-gray-400'
-              }`}
-          >
-            🖨️ ปริ้นคิวมือถืออัตโนมัติ: {autoPrintMobileOn ? 'เปิด' : 'ปิด'}
-          </button>
-          <button onClick={() => run(resetAllQueues)} disabled={busy} className="bg-red-50 hover:bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-md text-[10px] disabled:opacity-50">รีเซ็ตระบบคิวทั้งหมด</button>
-        </div>
+        <button onClick={() => run(resetAllQueues)} disabled={busy} className="ml-auto bg-red-50 hover:bg-red-100 text-red-600 font-bold px-2 py-0.5 rounded-md text-[10px] disabled:opacity-50">รีเซ็ตระบบคิวทั้งหมด</button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-3">
@@ -1636,13 +1534,10 @@ function DisplayView({ onExit }) {
   };
 
   // ==========================================================
-  // ปุ่ม "ออกจากหน้าจอทีวี" — เพราะ DisplayView เป็น fixed inset-0 z-[60] ที่ทับ
-  // เต็มหน้าจอ ทำให้แถบเมนู/แท็บด้านบนของแอปถูกบังจนกดสลับไปหน้าจออื่นไม่ได้เลย
-  // เดิมทีเคยมีปุ่มลอย (absolute) แยกต่างหากวางทับอยู่มุมซ้ายบน แต่มันไปบังโลโก้ X
-  // สีเขียว/ข้อความ "X-RAY DEPARTMENT" อยู่ใต้มัน จึงยุบมารวมกัน: ให้วงกลมโลโก้ X
-  // สีเขียวในเฮดเดอร์ทำหน้าที่เป็นปุ่มย้อนกลับไปเลย (ดูจุดที่เรียกใช้ handleExitDisplay
-  // ในเฮดเดอร์ด้านล่าง) ปุ่มนี้จะออกจากโหมดเต็มจอ (ถ้ากดขยายเต็มจอไว้) แล้วค่อยเรียก
-  // onExit เพื่อสลับกลับไปที่แท็บ "โต๊ะพนักงาน" ให้เจ้าหน้าที่ใช้งานแท็บอื่นๆ ต่อได้ตามปกติ
+  // ปุ่ม "ออกจากหน้าจอทีวี" — ย้ายมาซ้อนกับไอคอน X ของโลโก้ในแถบหัวข้อโดยตรง
+  // (เดิมเป็นปุ่มลอยทับมุมซ้ายบนจนบังโลโก้ จึงรวมเป็นปุ่มเดียวกัน)
+  // ฟังก์ชันนี้จะออกจากโหมดเต็มจอ (ถ้ากดขยายเต็มจอไว้) แล้วค่อยเรียก onExit เพื่อสลับ
+  // กลับไปที่แท็บ "โต๊ะพนักงาน" ให้เจ้าหน้าที่ใช้งานแท็บอื่นๆ ต่อได้ตามปกติ
   // ==========================================================
   const handleExitDisplay = () => {
     if (document.fullscreenElement && document.exitFullscreen) {
@@ -1740,11 +1635,10 @@ function DisplayView({ onExit }) {
           <div className="flex items-center gap-3">
             <button
               onClick={handleExitDisplay}
-              title="กดเพื่อย้อนกลับไปหน้าอื่น"
-              className="group relative w-12 h-12 bg-[#0e8345] hover:bg-[#0c6d39] rounded-full flex items-center justify-center text-white font-black text-xl shadow-md border-2 border-emerald-100 transition active:scale-95 shrink-0"
+              title="กลับไปหน้าอื่น"
+              className="w-12 h-12 bg-[#0e8345] hover:bg-[#0c6f38] rounded-full flex items-center justify-center text-white font-black text-xl shadow-md border-2 border-emerald-100 transition active:scale-95"
             >
-              <span className="transition-opacity group-hover:opacity-0">X</span>
-              <span className="absolute inset-0 flex items-center justify-center text-lg opacity-0 group-hover:opacity-100 transition-opacity">←</span>
+              X
             </button>
             <div className="hidden sm:block text-left">
               <span className="text-xs font-bold text-emerald-600 block tracking-wider uppercase">X-Ray Department</span>
@@ -1752,7 +1646,7 @@ function DisplayView({ onExit }) {
             </div>
           </div>
           <div className="text-center flex-grow">
-            <h2 className="text-3xl font-black text-[#10309c] tracking-wide">หมายเลขเรียกคิวซักประวัติ X-Ray</h2>
+            <h2 className="text-3xl font-black text-[#10309c] tracking-wide">หมายเลขเรียกเอกซเรย์</h2>
             <p className="text-xs font-semibold text-gray-500 mt-1">{dateString} • {timeString}</p>
           </div>
           <div className="w-16 h-16 rounded-full flex items-center justify-center shrink-0 bg-emerald-50 border-2 border-emerald-200 text-emerald-600 font-black text-2xl">

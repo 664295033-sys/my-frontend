@@ -1648,7 +1648,7 @@ function DisplayView({ onExit }) {
             </div>
           </div>
           <div className="text-center flex-grow">
-            <h2 className="text-3xl font-black text-[#10309c] tracking-wide">หมายเลขเรียกเอกซเรย์</h2>
+            <h2 className="text-3xl font-black text-[#10309c] tracking-wide">หมายเลขเรียกคิวซักประวัติ X-Ray</h2>
             <p className="text-xs font-semibold text-gray-500 mt-1">{dateString} • {timeString}</p>
           </div>
           <div className="w-16 h-16 rounded-full flex items-center justify-center shrink-0 bg-emerald-50 border-2 border-emerald-200 text-emerald-600 font-black text-2xl">

@@ -1634,7 +1634,7 @@ function DisplayView({ onExit }) {
             </button>
             <div className="hidden sm:block text-left">
               <span className="text-xs font-bold text-emerald-600 block tracking-wider uppercase">X-Ray Department</span>
-              <span className="text-[20px] text-gray-400 block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
+              <span className="text-[20px] text-black block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
             </div>
           </div>
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">

@@ -125,6 +125,16 @@ function EyeOffIcon({ size = 16, className = "" }) {
   );
 }
 
+// ไอคอนรูปคน (User) — ใช้กับปุ่มเข้าสู่ระบบของเจ้าหน้าที่บนหน้าจอทีวี
+function UserIcon({ size = 22, className = "" }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-3.5 3.5-6 8-6s8 2.5 8 6" />
+    </svg>
+  );
+}
+
 // ช่องกรอกรหัสผ่านที่มีปุ่มรูปตาสำหรับสลับดู/ซ่อนรหัสผ่าน — ใช้ร่วมกันทุกจุดที่มีการกรอกรหัสผ่าน
 function PasswordInput({ value, onChange, placeholder, onKeyDown, autoFocus, inputClassName = "" }) {
   const [visible, setVisible] = useState(false);
@@ -521,6 +531,11 @@ export default function App() {
   const [scanInfo] = useState(getScanParams); // อ่านครั้งเดียวตอนโหลดหน้า
   const [loginViewKey, setLoginViewKey] = useState(0); // เปลี่ยนค่านี้เพื่อบังคับ remount LoginView ล้างฟอร์มทิ้ง
 
+  // จอทีวีเป็นหน้า Home page เริ่มต้นเมื่อยังไม่ได้ล็อกอิน — ค่านี้ใช้สลับระหว่าง
+  // "จอทีวี" (guestScreen === 'tv') กับ "หน้าล็อกอินเจ้าหน้าที่" (guestScreen === 'login')
+  // ตอนที่ยังไม่มี staff ล็อกอินอยู่เลย
+  const [guestScreen, setGuestScreen] = useState('tv');
+
   // เมนูโปรไฟล์มุมขวาบน + อัปโหลดรูป + เปลี่ยนรหัสผ่าน
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const profileMenuRef = useRef(null);
@@ -640,6 +655,7 @@ export default function App() {
     clearStoredStaff();
     setActiveTab(1);
     setLoginViewKey(k => k + 1);
+    setGuestScreen('tv'); // ออกจากระบบแล้วกลับไปที่หน้าจอทีวีเป็น Home page ตามปกติ
   };
 
   const handleAvatarFileChange = async (e) => {
@@ -732,7 +748,20 @@ export default function App() {
     );
   }
 
+  // ==========================================================
+  // ยังไม่มีเจ้าหน้าที่ล็อกอิน — Home page คือหน้าจอทีวี (DisplayView) เสมอ
+  // เจ้าหน้าที่กดปุ่มไอคอนรูปคน (มุมขวาบนของจอทีวี) เพื่อสลับไปหน้าล็อกอิน
+  // ==========================================================
   if (!staff) {
+    if (guestScreen === 'tv') {
+      return (
+        <DisplayView
+          showLoginButton
+          onLoginClick={() => { unlockAudio(); setGuestScreen('login'); }}
+        />
+      );
+    }
+
     return (
       <div className="min-h-screen bg-emerald-50/60 font-sans text-gray-900 flex flex-col">
         <header className="bg-white shadow-sm border-b border-emerald-100 py-4">
@@ -743,6 +772,12 @@ export default function App() {
               className="w-10 h-10 rounded-full object-contain bg-white border border-emerald-100 shadow-sm p-0.5"
             />
             <h1 className="text-2xl font-bold tracking-tight text-emerald-600">Queue<span className="text-gray-800">System</span></h1>
+            <button
+              onClick={() => setGuestScreen('tv')}
+              className="ml-auto text-xs font-bold text-gray-500 hover:text-emerald-600 border border-gray-200 hover:border-emerald-300 rounded-lg px-3 py-1.5 transition"
+            >
+              ← กลับไปหน้าจอทีวี
+            </button>
           </div>
         </header>
         <main className="flex-1 flex items-center justify-center px-4 py-10">
@@ -1433,8 +1468,12 @@ function StaffDeskView() {
 
 // ==========================================================
 // หน้าจอแสดงผล (ทีวี)
+// เมื่อยังไม่มีเจ้าหน้าที่ล็อกอิน หน้านี้ทำหน้าที่เป็น Home page ของแอป
+// ("showLoginButton" + "onLoginClick" ใช้แสดงปุ่มไอคอนรูปคนมุมขวาบนแทนปุ่มเต็มจอปกติ
+// เพื่อให้เจ้าหน้าที่กดเข้าไปล็อกอินได้; เมื่อล็อกอินแล้ว หน้านี้ถูกเรียกผ่านแท็บ
+// "จอแสดงผล (ทีวี)" ตามปกติ โดยใช้ "onExit" แทน)
 // ==========================================================
-function DisplayView({ onExit }) {
+function DisplayView({ onExit, showLoginButton, onLoginClick }) {
   const { queues } = useRealtimeQueues();
   const displayRef = useRef(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -1546,6 +1585,18 @@ function DisplayView({ onExit }) {
     if (onExit) onExit();
   };
 
+  // ==========================================================
+  // ปุ่มไอคอนรูปคน — ใช้ตอนหน้าจอทีวีนี้ทำหน้าที่เป็น Home page (ยังไม่มีเจ้าหน้าที่
+  // ล็อกอิน) เพื่อให้พนักงานกดเข้าไปหน้าล็อกอินสำหรับเรียกคิวได้ ออกจากโหมดเต็มจอก่อน
+  // (ถ้ามี) เหมือนปุ่มออกด้านบน แล้วค่อยเรียก onLoginClick
+  // ==========================================================
+  const handleLoginButtonClick = () => {
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+    if (onLoginClick) onLoginClick();
+  };
+
   const currentCalling = {
     1: queues.find(q => q.status === 'calling' && q.counter_no === 1) || null,
     2: queues.find(q => q.status === 'calling' && q.counter_no === 2) || null
@@ -1625,13 +1676,15 @@ function DisplayView({ onExit }) {
       >
         <div className="bg-white text-black py-4 px-8 flex justify-between items-center shadow-lg z-10 border-b border-gray-200 shrink-0 relative">
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleExitDisplay}
-              title="กลับไปหน้าอื่น"
-              className="w-12 h-12 bg-[#0e8345] hover:bg-[#0c6f38] rounded-full flex items-center justify-center text-white font-black text-xl shadow-md border-2 border-emerald-100 transition active:scale-95"
-            >
-              
-            </button>
+            {!showLoginButton && (
+              <button
+                onClick={handleExitDisplay}
+                title="กลับไปหน้าอื่น"
+                className="w-12 h-12 bg-[#0e8345] hover:bg-[#0c6f38] rounded-full flex items-center justify-center text-white font-black text-xl shadow-md border-2 border-emerald-100 transition active:scale-95"
+              >
+                
+              </button>
+            )}
             <div className="hidden sm:block text-left">
               <span className="text-xs font-bold text-emerald-600 block tracking-wider uppercase">X-Ray Department</span>
               <span className="text-[20px] text-black block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
@@ -1641,13 +1694,24 @@ function DisplayView({ onExit }) {
             <h2 className="text-3xl font-black text-[#10309c] tracking-wide">หมายเลขเรียกคิวซักประวัติ X-Ray</h2>
             <p className="text-lg font-bold text-gray-600 mt-1.5">{dateString} • {timeString}</p>
           </div>
-          <button
-            onClick={toggleFullscreen}
-            title={isFullscreen ? 'ออกจากโหมดเต็มจอ' : 'ขยายเต็มจอ'}
-            className="w-16 h-16 rounded-full flex items-center justify-center shrink-0 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 text-emerald-600 font-black text-2xl transition active:scale-95"
-          >
-            SKH
-          </button>
+          <div className="flex items-center gap-2.5 shrink-0">
+            {showLoginButton && (
+              <button
+                onClick={handleLoginButtonClick}
+                title="เข้าสู่ระบบเจ้าหน้าที่"
+                className="w-12 h-12 rounded-full flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 text-emerald-600 transition active:scale-95"
+              >
+                <UserIcon size={22} />
+              </button>
+            )}
+            <button
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'ออกจากโหมดเต็มจอ' : 'ขยายเต็มจอ'}
+              className="w-16 h-16 rounded-full flex items-center justify-center shrink-0 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 text-emerald-600 font-black text-2xl transition active:scale-95"
+            >
+              SKH
+            </button>
+          </div>
         </div>
 
         <div className="bg-[#102d94] text-white py-3 px-6 border-b border-blue-900 z-10 flex items-center gap-4 overflow-hidden relative shadow-inner w-full shrink-0">
@@ -2096,6 +2160,7 @@ function MobileQueueView() {
                 </span>
                 <span className="relative text-7xl font-extrabold text-emerald-500 block tracking-tight">{myQueue.queue_no}</span>
 
+ 
                 <div className="relative border-t border-gray-100 pt-4 mt-5 text-center">
                   {typeof waitingCount === 'number' ? (
                     <div className="grid grid-cols-2 gap-3">

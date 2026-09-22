@@ -1630,7 +1630,7 @@ function DisplayView({ onExit }) {
               title="กลับไปหน้าอื่น"
               className="w-12 h-12 bg-[#0e8345] hover:bg-[#0c6f38] rounded-full flex items-center justify-center text-white font-black text-xl shadow-md border-2 border-emerald-100 transition active:scale-95"
             >
-              X
+              
             </button>
             <div className="hidden sm:block text-left">
               <span className="text-xs font-bold text-emerald-600 block tracking-wider uppercase">X-Ray Department</span>

@@ -1558,8 +1558,31 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
   useEffect(() => {
     const el = displayRef.current;
     if (el && el.requestFullscreen) {
-      el.requestFullscreen().catch(() => { /* ไม่มี user-gesture ก็ไม่เป็นไร ยังพอดีจอด้วย scale-to-fit อยู่ดี */ });
+      el.requestFullscreen().catch(() => { /* ไม่มี user-gesture ก็ไม่เป็นไร — effect ด้านล่างจะลองใหม่ทันทีที่มีการแตะ/คลิกครั้งแรก */ });
     }
+  }, []);
+
+  // ==========================================================
+  // เบราว์เซอร์ส่วนใหญ่ (Chrome/Safari/Android TV) จะบล็อกการขอเต็มจอถ้าไม่ได้มา
+  // จาก "user gesture" จริงๆ ทำให้ requestFullscreen() ตอนโหลดหน้าด้านบนมักไม่สำเร็จ
+  // แบบเงียบๆ (โดนดักไว้ด้วย .catch แล้ว) — จึงดักฟังการแตะ/คลิก/กดปุ่มครั้งแรกสุดของ
+  // ผู้ใช้ทั้งหน้า (ไม่ว่าจะแตะตรงไหนก็ตาม) แล้วรีบขอเต็มจอให้ทันที เพื่อให้ผู้ใช้ไม่ต้อง
+  // ไปหาปุ่ม "ขยายเต็มจอ" เองเลย เพียงแค่แตะหน้าจอครั้งเดียวก็เข้าเต็มจอให้อัตโนมัติ
+  // ==========================================================
+  useEffect(() => {
+    if (document.fullscreenElement) return;
+    const tryFullscreenOnFirstInteraction = () => {
+      const el = displayRef.current;
+      if (el && el.requestFullscreen && !document.fullscreenElement) {
+        el.requestFullscreen().catch(() => { /* ไม่เป็นไร ยังพอดีจอด้วย scale-to-fit อยู่ดี */ });
+      }
+    };
+    document.addEventListener('pointerdown', tryFullscreenOnFirstInteraction, { once: true, capture: true });
+    document.addEventListener('keydown', tryFullscreenOnFirstInteraction, { once: true, capture: true });
+    return () => {
+      document.removeEventListener('pointerdown', tryFullscreenOnFirstInteraction, { capture: true });
+      document.removeEventListener('keydown', tryFullscreenOnFirstInteraction, { capture: true });
+    };
   }, []);
 
   const toggleFullscreen = () => {

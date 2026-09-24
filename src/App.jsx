@@ -18,6 +18,10 @@ const RECAPTCHA_SITE_KEY = '6Lexe6gtAAAAAFO4kRBx1ya8w5gMUCvKTgizJUeV';
 // โลโก้โรงพยาบาลสงขลา (สีเขียว) — ใช้ที่หน้าจอมือถือคนไข้
 const HOSPITAL_LOGO_GREEN_SRC = "https://cdn.phototourl.com/free/2026-09-03-12722a13-ae77-4daa-87f1-85cd8fe06ed3.jpg";
 
+// โลโก้ที่ใช้กับปุ่มมุมซ้าย/ขวาของหน้าจอทีวี (ปุ่มออก/ปุ่มล็อกอิน และปุ่มขยายเต็มจอ)
+// ทั้งสองปุ่มใช้โลโก้เดียวกันนี้ และมีขนาดเท่ากัน — ฟังก์ชันการทำงานของปุ่มยังเหมือนเดิมทุกอย่าง
+const TV_BUTTON_LOGO_SRC = "https://cdn.phototourl.com/member/2026-09-24-151f8020-13e6-41dd-bd3b-4da0f588024f.jpg";
+
 // ==========================================================
 // พื้นหลังหน้าจอเข้าสู่ระบบเจ้าหน้าที่ — ใช้รูปภาพที่กำหนดเอง (custom URL)
 // ==========================================================
@@ -1703,9 +1707,9 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
               <button
                 onClick={handleExitDisplay}
                 title="กลับไปหน้าอื่น"
-                className="w-12 h-12 bg-[#0e8345] hover:bg-[#0c6f38] rounded-full flex items-center justify-center text-white font-black text-xl shadow-md border-2 border-emerald-100 transition active:scale-95"
+                className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center shadow-md border-2 border-emerald-100 transition active:scale-95 bg-white"
               >
-                
+                <img src={TV_BUTTON_LOGO_SRC} alt="กลับไปหน้าอื่น" className="w-full h-full object-cover" />
               </button>
             )}
             <div className="hidden sm:block text-left">
@@ -1722,17 +1726,17 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
               <button
                 onClick={handleLoginButtonClick}
                 title="เข้าสู่ระบบเจ้าหน้าที่"
-                className="w-12 h-12 rounded-full flex items-center justify-center bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 text-emerald-600 transition active:scale-95"
+                className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center bg-white border-2 border-emerald-100 shadow-md transition active:scale-95"
               >
-                <UserIcon size={22} />
+                <img src={TV_BUTTON_LOGO_SRC} alt="เข้าสู่ระบบเจ้าหน้าที่" className="w-full h-full object-cover" />
               </button>
             )}
             <button
               onClick={toggleFullscreen}
               title={isFullscreen ? 'ออกจากโหมดเต็มจอ' : 'ขยายเต็มจอ'}
-              className="w-16 h-16 rounded-full flex items-center justify-center shrink-0 bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-200 text-emerald-600 font-black text-2xl transition active:scale-95"
+              className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center shrink-0 bg-white border-2 border-emerald-100 shadow-md transition active:scale-95"
             >
-              SKH
+              <img src={TV_BUTTON_LOGO_SRC} alt={isFullscreen ? 'ออกจากโหมดเต็มจอ' : 'ขยายเต็มจอ'} className="w-full h-full object-cover" />
             </button>
           </div>
         </div>

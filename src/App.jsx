@@ -1673,7 +1673,7 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
 
   const scanBaseUrl = PUBLIC_APP_BASE_URL || (window.location.origin + window.location.pathname);
   const scanUrl = buildScanUrl(scanBaseUrl, qrToken);
-  const qrCodeSrc = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(scanUrl)}`;
+  const qrCodeSrc = `https://api.qrserver.com/v1/create-qr-code/?size=340x340&data=${encodeURIComponent(scanUrl)}`;
   const scanUrlLooksUnreachable = isLikelyUnreachableFromMobileData(scanBaseUrl);
 
   const counterStyles = {
@@ -1756,10 +1756,10 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
               สแกนรับคิว
             </div>
             <div className="flex-grow flex flex-col justify-center items-center py-8 px-6 gap-4 min-h-[220px]">
-              <div className="bg-white p-3 rounded-2xl shadow-lg">
-                <img src={qrCodeSrc} alt="QR Code สำหรับสแกนรับคิว" className="w-40 h-40 sm:w-44 sm:h-44 rounded" />
+              <div className="bg-white p-4 rounded-2xl shadow-lg">
+                <img src={qrCodeSrc} alt="QR Code สำหรับสแกนรับคิว" className="w-64 h-64 sm:w-72 sm:h-72 rounded" />
               </div>
-              <p className="text-xs text-gray-400 text-center max-w-[220px] leading-relaxed">
+              <p className="text-base text-gray-400 text-center max-w-[300px] leading-relaxed">
                 สแกนด้วยกล้องมือถือเพื่อรับบัตรคิวดิจิทัลและติดตามคิวได้ทันที
               </p>
               {scanUrlLooksUnreachable && (

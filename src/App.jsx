@@ -40,7 +40,7 @@ const STAFF_LOGIN_BG_SRC = "https://cdn.phototourl.com/free/2026-09-03-43a6baa9-
 // ต่อ WiFi โรงพยาบาลอยู่ก็อาจเข้าไม่ได้ด้วยถ้า IP นั้นเปลี่ยนไปหรือไฟร์วอลล์กั้นไว้
 // วิธีแก้ถาวรคือต้อง deploy แอปนี้ขึ้นที่อยู่สาธารณะแล้วใส่ URL นั้นไว้ตรงนี้
 // ==========================================================
-const PUBLIC_APP_BASE_URL = 'https://xrayq.skhospital.go.th/?scan=1&qt=20260909';
+const PUBLIC_APP_BASE_URL = 'https://xrayq.skhospital.go.th';
 
 // ตรวจว่า URL ที่จะใช้สร้าง QR Code เป็นที่อยู่วงในหรือ localhost หรือไม่ (เข้าจาก
 // เน็ตมือถือภายนอกไม่ได้แน่นอน) เพื่อเตือนเจ้าหน้าที่ให้เห็นชัดๆ บนจอทีวีเลย แทนที่จะ
@@ -1752,7 +1752,7 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
 
         <div className="grid grid-cols-3 gap-4 px-4 py-4 flex-grow items-stretch z-10 bg-gray-950 min-h-0">
           <div className="flex flex-col border-2 border-gray-800 bg-[#111827] shadow-2xl relative rounded-2xl overflow-hidden">
-            <div className="py-6 px-4 text-center font-black text-3xl tracking-wide text-emerald-400 border-b border-white/10 uppercase">
+            <div className="py-6 px-4 text-center font-black text-5xl tracking-wide text-emerald-400 border-b border-white/10 uppercase">
               สแกนรับคิว
             </div>
             <div className="flex-grow flex flex-col justify-center items-center py-8 px-6 gap-4 min-h-[220px]">
@@ -1775,24 +1775,24 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
             const style = counterStyles[counterNo];
             return (
               <div key={counterNo} className={`flex flex-col border-2 ${style.borderColor} ${style.bgColor} shadow-2xl transition-all duration-300 relative rounded-2xl`}>
-                <div className={`py-6 px-4 text-center font-black text-3xl tracking-wide ${style.headerTextColor} border-b border-white/10 uppercase`}>
+                <div className={`py-6 px-4 text-center font-black text-5xl tracking-wide ${style.headerTextColor} border-b border-white/10 uppercase`}>
                   ช่องที่ {counterNo}
                 </div>
                 <div className="flex-grow flex flex-col justify-center items-center py-12 px-4 min-h-[220px]">
                   {activeQueue ? (
                     <div className="text-center w-full">
-                      <div className="text-8xl md:text-[110px] leading-none font-black text-white tracking-tighter drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)] animate-pulse">
+                      <div className="text-[160px] leading-none font-black text-white tracking-tighter drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)] animate-pulse">
                         {activeQueue.queue_no}
                       </div>
-                      <div className="mt-6 text-sm font-semibold text-white/60 tracking-widest flex items-center justify-center gap-1.5 uppercase">
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#ccff00] animate-pulse"></span>
-                        กำลังตรวจ
+                      <div className="mt-8 text-xl font-semibold text-white/60 tracking-widest flex items-center justify-center gap-2 uppercase">
+                        <span className="w-3 h-3 rounded-full bg-[#ccff00] animate-pulse"></span>
+                        กำลังซักประวัติ
                       </div>
                     </div>
                   ) : (
                     <div className="text-center py-6 opacity-30">
-                      <div className="text-6xl font-black tracking-widest text-white/50">- - -</div>
-                      <p className="mt-2 text-xs text-white/40 font-bold uppercase tracking-wider">ว่าง / ไม่มีคิว</p>
+                      <div className="text-8xl font-black tracking-widest text-white/50">- - -</div>
+                      <p className="mt-3 text-base text-white/40 font-bold uppercase tracking-wider">ว่าง / ไม่มีคิว</p>
                     </div>
                   )}
                 </div>
@@ -2603,4 +2603,4 @@ function StaffManagementView({ currentStaffId }) {
       </table>
     </div>
   );
-} 
+}

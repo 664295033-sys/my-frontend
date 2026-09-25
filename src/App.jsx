@@ -1711,7 +1711,7 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
             )}
             <div className="hidden sm:block text-left">
               <span className="text-xs font-bold text-emerald-600 block tracking-wider uppercase">X-Ray Department</span>
-              <span className="text-[20px] text-black block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
+              <span className="text-[30px] text-black block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
             </div>
           </div>
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
@@ -1866,7 +1866,12 @@ function getTodayQueueStorageKey() {
   return `xray_patient_queue_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function saveQueueRefToStorage(queue) {
-  try { localStorage.setItem(getTodayQueueStorageKey(), JSON.stringify({ id: queue.id, queue_no: queue.queue_no })); } catch (e) { /* no-op */ }
+  // เก็บเวลาที่ "ได้รับคิวจริง" (created_at จากเซิร์ฟเวอร์ ถ้ามี ไม่งั้น fallback เป็นเวลา
+  // ปัจจุบันของเครื่อง) ไว้ด้วย ไม่ใช่แค่ id/queue_no เฉยๆ เพื่อให้ถ้าปิดแอปแล้วเปิดใหม่
+  // (กลับมาที่หน้านี้แบบไม่ผ่านฟอร์มกรอกเบอร์อีกครั้ง) ยังมีวันที่/เวลามาโชว์ในบัตรคิว
+  // และในภาพที่บันทึกได้ครบ ไม่ใช่ต้องรอ handleSubmit ทำงานใหม่เท่านั้น
+  const scannedAt = queue.created_at || new Date().toISOString();
+  try { localStorage.setItem(getTodayQueueStorageKey(), JSON.stringify({ id: queue.id, queue_no: queue.queue_no, scannedAt })); } catch (e) { /* no-op */ }
 }
 function getStoredQueueRef() {
   try {
@@ -1899,7 +1904,22 @@ function MobileQueueView() {
   const [calledAlert, setCalledAlert] = useState(false);
   const [timeString, setTimeString] = useState('');
   const [dateString, setDateString] = useState('');
-  const [scanTime, setScanTime] = useState(null);
+  const [scanTime, setScanTime] = useState(() => {
+    const stored = getStoredQueueRef();
+    if (stored && stored.scannedAt) {
+      return new Date(stored.scannedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    return null;
+  });
+  // วันที่ (แยกจากเวลา) ของตอนที่ได้รับคิว — คู่กับ scanTime ด้านบน ใช้แสดงในป้าย
+  // "สแกนเมื่อ" บนบัตรคิว ให้เห็นครบทั้งวันและเวลา ไม่ใช่แค่เวลาอย่างเดียว
+  const [scanDateOnly, setScanDateOnly] = useState(() => {
+    const stored = getStoredQueueRef();
+    if (stored && stored.scannedAt) {
+      return new Date(stored.scannedAt).toLocaleDateString('th-TH', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+    }
+    return null;
+  });
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [downloadingImage, setDownloadingImage] = useState(false);
   const lastStatusRef = useRef(null);
@@ -1978,6 +1998,12 @@ function MobileQueueView() {
   const finishQueueSetup = (queue, { isNew }) => {
     saveIdentifierToStorage(identifierInput.trim());
     saveQueueRefToStorage(queue);
+    // ใช้ created_at จากเซิร์ฟเวอร์เป็นหลัก (ตรงกับเวลาที่ระบบออกคิวจริง) ไม่ใช่เวลาที่
+    // เครื่องผู้ป่วยกดปุ่ม เผื่อกรณีเน็ตช้า/ล่าช้า ให้วันที่-เวลาที่โชว์ตรงกับข้อมูลจริงเสมอ
+    const scannedAtIso = queue.created_at || new Date().toISOString();
+    const scannedAtDate = new Date(scannedAtIso);
+    setScanTime(scannedAtDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    setScanDateOnly(scannedAtDate.toLocaleDateString('th-TH', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }));
     lastStatusRef.current = queue.status;
     setSelectedQueueId(queue.id);
     setShowForm(false);
@@ -1992,8 +2018,6 @@ function MobileQueueView() {
     if (err) { setIdentifierError(err); return; }
     setIdentifierError('');
     setSubmitting(true);
-    const currentTimeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    setScanTime(currentTimeStr);
     try {
       const result = await insertQueue({ source: 'mobile', identifier: identifierInput.trim(), queueType: 'opd' });
       if (result.duplicate) {
@@ -2132,7 +2156,7 @@ function MobileQueueView() {
               ระบบติดตามคิวมือถือ
             </h3>
             <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-widest">Songkhla Hospital X-Ray Live</p>
-            <p className="text-[11px] text-gray-400 font-medium mt-1">{dateString} • {timeString}</p>
+            <p className="text-sm text-gray-500 font-semibold mt-1">{dateString} • {timeString}</p>
           </div>
         </div>
 
@@ -2178,8 +2202,8 @@ function MobileQueueView() {
                 <div className="bg-white border border-gray-100 rounded-3xl p-6 text-center shadow-sm relative overflow-hidden">
                   <XRayIcon size={120} className="absolute -right-6 -top-6 text-emerald-50 pointer-events-none" />
                   {scanTime && (
-                    <div className="absolute top-0 right-0 bg-gray-50 text-gray-400 text-[9px] font-semibold px-3 py-1.5 rounded-bl-2xl tracking-wide">
-                      สแกนเมื่อ {dateString} {scanTime}
+                    <div className="absolute top-0 right-0 bg-gray-50 text-gray-500 text-[10px] font-semibold px-3 py-1.5 rounded-bl-2xl tracking-wide">
+                      สแกนเมื่อ {scanDateOnly} {scanTime}
                     </div>
                   )}
                   <span className="relative text-[11px] text-gray-400 font-semibold flex items-center justify-center gap-1 uppercase tracking-widest mb-2">

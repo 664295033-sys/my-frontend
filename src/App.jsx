@@ -180,6 +180,32 @@ function clearStoredStaff() {
 // ==========================================================
 // ตรวจ URL ตอนเปิดแอปว่ามาจากการสแกน QR หรือไม่ (?scan=1&qt=รหัสวันนี้)
 // ==========================================================
+// ==========================================================
+// จัดรูปแบบวัน/เดือน/ปี/เวลาแบบไทยด้วยตัวเอง (ไม่พึ่ง toLocaleDateString/toLocaleTimeString)
+// สาเหตุ: บางเบราว์เซอร์/แอปในตัว (เช่น in-app browser ของ LINE, WebView บาง Android
+// รุ่นเก่า) มีข้อมูล ICU/Intl ไม่ครบสำหรับ locale 'th-TH' ทำให้ toLocaleDateString ที่ขอ
+// ทั้ง weekday/day/month/year บางครั้งจะ "หายไปเฉยๆ" บางส่วน (เช่น ขึ้นแค่เดือน ไม่ขึ้น
+// วันที่กับปี) โดยไม่มี error ให้เห็น การคำนวณเองตรงนี้ทำให้มั่นใจได้ว่าจะได้ครบทุกส่วน
+// เหมือนกันทุกเครื่อง ไม่ต้องพึ่งพา Intl ของอุปกรณ์เลย
+// ==========================================================
+const THAI_WEEKDAYS_SHORT = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+function formatThaiDate(date) {
+  if (!(date instanceof Date) || isNaN(date.getTime())) return '';
+  const weekday = THAI_WEEKDAYS_SHORT[date.getDay()];
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = THAI_MONTHS_SHORT[date.getMonth()];
+  const buddhistYear = date.getFullYear() + 543;
+  return `${weekday} ${day} ${month} ${buddhistYear}`;
+}
+function formatThaiTime(date) {
+  if (!(date instanceof Date) || isNaN(date.getTime())) return '';
+  const h = String(date.getHours()).padStart(2, '0');
+  const m = String(date.getMinutes()).padStart(2, '0');
+  const s = String(date.getSeconds()).padStart(2, '0');
+  return `${h}:${m}:${s}`;
+}
+
 function getScanParams() {
   if (typeof window === 'undefined') return { isScan: false, qrTokenParam: null };
   try {
@@ -1711,7 +1737,7 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
             )}
             <div className="hidden sm:block text-left">
               <span className="text-xs font-bold text-emerald-600 block tracking-wider uppercase">X-Ray Department</span>
-              <span className="text-[29.5px] text-black block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
+              <span className="text-[27.5px] text-black block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
             </div>
           </div>
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">

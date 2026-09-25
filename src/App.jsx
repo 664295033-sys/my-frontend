@@ -41,7 +41,7 @@ const STAFF_LOGIN_BG_SRC = "https://cdn.phototourl.com/free/2026-09-03-43a6baa9-
 // ต่อ WiFi โรงพยาบาลอยู่ก็อาจเข้าไม่ได้ด้วยถ้า IP นั้นเปลี่ยนไปหรือไฟร์วอลล์กั้นไว้
 // วิธีแก้ถาวรคือต้อง deploy แอปนี้ขึ้นที่อยู่สาธารณะแล้วใส่ URL นั้นไว้ตรงนี้
 // ==========================================================
-const PUBLIC_APP_BASE_URL = 'https://xrayq.skhospital.go.th';
+const PUBLIC_APP_BASE_URL = 'https://xrayq.skhospital.go.th/';
 
 // ตรวจว่า URL ที่จะใช้สร้าง QR Code เป็นที่อยู่วงในหรือ localhost หรือไม่ (เข้าจาก
 // เน็ตมือถือภายนอกไม่ได้แน่นอน) เพื่อเตือนเจ้าหน้าที่ให้เห็นชัดๆ บนจอทีวีเลย แทนที่จะ
@@ -1711,7 +1711,7 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
             )}
             <div className="hidden sm:block text-left">
               <span className="text-xs font-bold text-emerald-600 block tracking-wider uppercase">X-Ray Department</span>
-              <span className="text-[20px] text-black block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
+              <span className="text-[30px] text-black block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
             </div>
           </div>
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
@@ -1903,7 +1903,9 @@ function MobileQueueView() {
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [downloadingImage, setDownloadingImage] = useState(false);
   const lastStatusRef = useRef(null);
-  const queueCardRef = useRef(null);
+  // ref ตัวนี้ครอบตั้งแต่โลโก้/หัวข้อ/วันเวลา ไปจนถึงบัตรคิวและสถานะช่องบริการ เพื่อให้
+  // ตอนกด "บันทึกภาพบัตรคิว" ได้ภาพที่ครบทั้งหน้า ไม่ใช่แค่การ์ดเล็กๆชิ้นเดียวเหมือนก่อนหน้านี้
+  const pageCaptureRef = useRef(null);
 
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [duplicateQueue, setDuplicateQueue] = useState(null);
@@ -1912,11 +1914,11 @@ function MobileQueueView() {
   const myQueue = queues.find(q => q.id === selectedQueueId) || null;
 
   const downloadQueueImage = async () => {
-    if (!queueCardRef.current || !myQueue) return;
+    if (!pageCaptureRef.current || !myQueue) return;
     setDownloadingImage(true);
     try {
       const html2canvas = await loadHtml2Canvas();
-      const canvas = await html2canvas(queueCardRef.current, { backgroundColor: '#ffffff', scale: 2, useCORS: true });
+      const canvas = await html2canvas(pageCaptureRef.current, { backgroundColor: '#ffffff', scale: 2, useCORS: true });
       canvas.toBlob(async (blob) => {
         if (!blob) { setDownloadingImage(false); return; }
         const fileName = `คิวเอกซเรย์-${myQueue.queue_no}.png`;
@@ -2110,123 +2112,129 @@ function MobileQueueView() {
         </div>
       )}
 
-      <div className="pt-7 pb-5 px-5 text-center flex flex-col items-center gap-2.5 border-b border-gray-100">
-        <div className="relative w-16 h-16 shrink-0">
-          <div className="w-16 h-16 rounded-full overflow-hidden shadow-sm border border-gray-100 bg-white">
-            <img
-              src={HOSPITAL_LOGO_GREEN_SRC}
-              alt="โลโก้โรงพยาบาลสงขลา"
-              className="w-full h-full object-contain p-1"
-            />
-          </div>
-          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md border-2 border-white">
-            <XRayIcon size={12} />
-          </div>
-        </div>
-        <div>
-          <h3 className="text-base font-bold text-gray-900 flex items-center justify-center gap-1.5">
-            <XRayIcon size={16} className="text-emerald-400" />
-            ระบบติดตามคิวมือถือ
-          </h3>
-          <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-widest">Songkhla Hospital X-Ray Live</p>
-          <p className="text-[11px] text-gray-400 font-medium mt-1">{dateString} • {timeString}</p>
-        </div>
-      </div>
-
-      {showForm ? (
-        <div className="px-6 py-10 flex-grow flex flex-col justify-center space-y-6">
-          <div className="text-center space-y-3">
-            <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
-              <XRayIcon size={28} />
+      <div ref={pageCaptureRef} className="bg-white">
+        <div className="pt-7 pb-5 px-5 text-center flex flex-col items-center gap-2.5 border-b border-gray-100">
+          <div className="relative w-16 h-16 shrink-0">
+            <div className="w-16 h-16 rounded-full overflow-hidden shadow-sm border border-gray-100 bg-white">
+              <img
+                src={HOSPITAL_LOGO_GREEN_SRC}
+                alt="โลโก้โรงพยาบาลสงขลา"
+                className="w-full h-full object-contain p-1"
+              />
             </div>
-            <h4 className="text-lg font-bold text-gray-900">ยืนยันตัวตนก่อนรับคิว</h4>
-            <p className="text-[13px] text-gray-400 max-w-[260px] mx-auto leading-relaxed">
-              กรอกเบอร์โทรศัพท์ 10 หลัก เพื่อป้องกันการรับคิวซ้ำ แม้จะปิดหน้าจอนี้ไปแล้วก็ตาม
-            </p>
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md border-2 border-white">
+              <XRayIcon size={12} />
+            </div>
           </div>
-          <div className="space-y-2">
-            <input
-              type="tel"
-              inputMode="numeric"
-              maxLength={10}
-              value={identifierInput}
-              onChange={(e) => { setIdentifierInput(e.target.value.replace(/[^\d]/g, '')); setIdentifierError(''); }}
-              placeholder="0812345678"
-              className="w-full bg-gray-50 border border-gray-200 focus:border-emerald-400 focus:bg-white outline-none text-gray-900 text-center text-2xl font-bold tracking-[0.2em] py-4 rounded-2xl placeholder:text-gray-300 placeholder:tracking-normal placeholder:font-normal placeholder:text-base transition"
-              autoFocus
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-            />
-            {identifierError && <p className="text-red-500 text-xs font-semibold text-center">{identifierError}</p>}
+          <div>
+            <h3 className="text-base font-bold text-gray-900 flex items-center justify-center gap-1.5">
+              <XRayIcon size={16} className="text-emerald-400" />
+              ระบบติดตามคิวมือถือ
+            </h3>
+            <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-widest">Songkhla Hospital X-Ray Live</p>
+            <p className="text-[11px] text-gray-400 font-medium mt-1">{dateString} • {timeString}</p>
           </div>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-bold text-sm py-4 rounded-2xl transition active:scale-[0.98] shadow-lg shadow-emerald-500/20"
-          >
-            {submitting ? 'กำลังรับคิว...' : 'ยืนยันและรับคิว'}
-          </button>
         </div>
-      ) : (
-        <div className="p-5 flex-grow flex flex-col justify-center space-y-5 bg-gray-50/60">
-          {!myQueue ? (
-            <div className="text-center py-10 text-gray-400 text-sm">กำลังโหลดข้อมูลคิว...</div>
-          ) : (
-            <div className="space-y-4">
-              <div ref={queueCardRef} className="bg-white border border-gray-100 rounded-3xl p-6 text-center shadow-sm relative overflow-hidden">
-                <XRayIcon size={120} className="absolute -right-6 -top-6 text-emerald-50 pointer-events-none" />
-                {scanTime && (
-                  <div className="absolute top-0 right-0 bg-gray-50 text-gray-400 text-[9px] font-semibold px-3 py-1.5 rounded-bl-2xl tracking-wide">
-                    สแกนเมื่อ {scanTime}
-                  </div>
-                )}
-                <span className="relative text-[11px] text-gray-400 font-semibold flex items-center justify-center gap-1 uppercase tracking-widest mb-2">
-                  <XRayIcon size={13} className="text-emerald-400" /> คิวตรวจของคุณคือ
-                </span>
-                <span className="relative text-7xl font-extrabold text-emerald-500 block tracking-tight">{myQueue.queue_no}</span>
+
+        {showForm ? (
+          <div className="px-6 py-10 flex-grow flex flex-col justify-center space-y-6">
+            <div className="text-center space-y-3">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center">
+                <XRayIcon size={28} />
+              </div>
+              <h4 className="text-lg font-bold text-gray-900">ยืนยันตัวตนก่อนรับคิว</h4>
+              <p className="text-[13px] text-gray-400 max-w-[260px] mx-auto leading-relaxed">
+                กรอกเบอร์โทรศัพท์ 10 หลัก เพื่อป้องกันการรับคิวซ้ำ แม้จะปิดหน้าจอนี้ไปแล้วก็ตาม
+              </p>
+            </div>
+            <div className="space-y-2">
+              <input
+                type="tel"
+                inputMode="numeric"
+                maxLength={10}
+                value={identifierInput}
+                onChange={(e) => { setIdentifierInput(e.target.value.replace(/[^\d]/g, '')); setIdentifierError(''); }}
+                placeholder="0812345678"
+                className="w-full bg-gray-50 border border-gray-200 focus:border-emerald-400 focus:bg-white outline-none text-gray-900 text-center text-2xl font-bold tracking-[0.2em] py-4 rounded-2xl placeholder:text-gray-300 placeholder:tracking-normal placeholder:font-normal placeholder:text-base transition"
+                autoFocus
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+              />
+              {identifierError && <p className="text-red-500 text-xs font-semibold text-center">{identifierError}</p>}
+            </div>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white font-bold text-sm py-4 rounded-2xl transition active:scale-[0.98] shadow-lg shadow-emerald-500/20"
+            >
+              {submitting ? 'กำลังรับคิว...' : 'ยืนยันและรับคิว'}
+            </button>
+          </div>
+        ) : (
+          <div className="p-5 flex-grow flex flex-col justify-center space-y-5 bg-gray-50/60">
+            {!myQueue ? (
+              <div className="text-center py-10 text-gray-400 text-sm">กำลังโหลดข้อมูลคิว...</div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-white border border-gray-100 rounded-3xl p-6 text-center shadow-sm relative overflow-hidden">
+                  <XRayIcon size={120} className="absolute -right-6 -top-6 text-emerald-50 pointer-events-none" />
+                  {scanTime && (
+                    <div className="absolute top-0 right-0 bg-gray-50 text-gray-400 text-[9px] font-semibold px-3 py-1.5 rounded-bl-2xl tracking-wide">
+                      สแกนเมื่อ {dateString} {scanTime}
+                    </div>
+                  )}
+                  <span className="relative text-[11px] text-gray-400 font-semibold flex items-center justify-center gap-1 uppercase tracking-widest mb-2">
+                    <XRayIcon size={13} className="text-emerald-400" /> คิวตรวจของคุณคือ
+                  </span>
+                  <span className="relative text-7xl font-extrabold text-emerald-500 block tracking-tight">{myQueue.queue_no}</span>
 
  
-                <div className="relative border-t border-gray-100 pt-4 mt-5 text-center">
-                  {typeof waitingCount === 'number' ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="bg-gray-50 rounded-2xl py-3">
-                        <span className="text-[10px] text-gray-400 block font-semibold mb-0.5">เหลืออีก</span>
-                        <span className="text-2xl font-extrabold text-gray-900">{waitingCount} <span className="text-xs font-medium text-gray-400">คิว</span></span>
+                  <div className="relative border-t border-gray-100 pt-4 mt-5 text-center">
+                    {typeof waitingCount === 'number' ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-gray-50 rounded-2xl py-3">
+                          <span className="text-[10px] text-gray-400 block font-semibold mb-0.5">เหลืออีก</span>
+                          <span className="text-2xl font-extrabold text-gray-900">{waitingCount} <span className="text-xs font-medium text-gray-400">คิว</span></span>
+                        </div>
+                        <div className="bg-gray-50 rounded-2xl py-3">
+                          <span className="text-[10px] text-gray-400 block font-semibold mb-0.5">รอประมาณ</span>
+                          <span className="text-2xl font-extrabold text-gray-900">{estimatedTime} <span className="text-xs font-medium text-gray-400">นาที</span></span>
+                        </div>
                       </div>
-                      <div className="bg-gray-50 rounded-2xl py-3">
-                        <span className="text-[10px] text-gray-400 block font-semibold mb-0.5">รอประมาณ</span>
-                        <span className="text-2xl font-extrabold text-gray-900">{estimatedTime} <span className="text-xs font-medium text-gray-400">นาที</span></span>
-                      </div>
-                    </div>
-                  ) : (
-                    <span className={`text-sm font-bold ${isProblem ? 'text-red-500' : 'text-emerald-500'}`}>{statusText}</span>
-                  )}
+                    ) : (
+                      <span className={`text-sm font-bold ${isProblem ? 'text-red-500' : 'text-emerald-500'}`}>{statusText}</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest text-left px-1">สถานะคิวปัจจุบันที่หน้าห้องตรวจ</h4>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {COUNTERS.map(num => {
+                      const activeQ = queues.find(q => q.status === 'calling' && q.counter_no === num);
+                      return (
+                        <div key={num} className="bg-white border border-gray-100 rounded-2xl p-3 text-center shadow-sm">
+                          <span className="text-[10px] text-gray-400 font-semibold block mb-0.5">ช่อง {num}</span>
+                          <span className="text-lg font-extrabold text-gray-900 block">{activeQ ? activeQ.queue_no : '---'}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
+            )}
+          </div>
+        )}
+      </div>
 
-              <button
-                onClick={downloadQueueImage}
-                disabled={downloadingImage}
-                className="w-full bg-emerald-50 hover:bg-emerald-100 disabled:opacity-60 text-emerald-700 font-bold text-sm py-3 rounded-2xl transition active:scale-[0.98] flex items-center justify-center gap-2"
-              >
-                {downloadingImage ? 'กำลังบันทึกภาพ...' : '📷 บันทึกภาพบัตรคิว'}
-              </button>
-
-              <div className="space-y-2 pt-1">
-                <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest text-left px-1">สถานะคิวปัจจุบันที่หน้าห้องตรวจ</h4>
-                <div className="grid grid-cols-2 gap-2.5">
-                  {COUNTERS.map(num => {
-                    const activeQ = queues.find(q => q.status === 'calling' && q.counter_no === num);
-                    return (
-                      <div key={num} className="bg-white border border-gray-100 rounded-2xl p-3 text-center shadow-sm">
-                        <span className="text-[10px] text-gray-400 font-semibold block mb-0.5">ช่อง {num}</span>
-                        <span className="text-lg font-extrabold text-gray-900 block">{activeQ ? activeQ.queue_no : '---'}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
+      {!showForm && myQueue && (
+        <div className="px-5 pb-1 bg-gray-50/60">
+          <button
+            onClick={downloadQueueImage}
+            disabled={downloadingImage}
+            className="w-full bg-emerald-50 hover:bg-emerald-100 disabled:opacity-60 text-emerald-700 font-bold text-sm py-3 rounded-2xl transition active:scale-[0.98] flex items-center justify-center gap-2"
+          >
+            {downloadingImage ? 'กำลังบันทึกภาพ...' : '📷 บันทึกภาพบัตรคิว (ทั้งหน้า)'}
+          </button>
         </div>
       )}
 

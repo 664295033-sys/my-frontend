@@ -17,7 +17,7 @@ const RECAPTCHA_SITE_KEY = '6Lexe6gtAAAAAFO4kRBx1ya8w5gMUCvKTgizJUeV';
 
 // โลโก้โรงพยาบาลสงขลา (สีเขียว) — ใช้ที่หน้าจอมือถือคนไข้ และปุ่มมุมซ้าย/ขวาของหน้าจอทีวี
 // (ปุ่มออก/ปุ่มล็อกอิน และปุ่มขยายเต็มจอ) เพื่อให้โลโก้เหมือนกันทั้งสองหน้าจอ
-const HOSPITAL_LOGO_GREEN_SRC = "https://cdn.phototourl.com/free/2026-09-03-12722a13-ae77-4daa-87f1-85cd8fe06ed3.jpg";
+const HOSPITAL_LOGO_GREEN_SRC = "https://cdn.phototourl.com/member/2026-09-25-3b7c1904-7ba7-4912-8129-d23d8009dd08.jpg";
 
 // ==========================================================
 // พื้นหลังหน้าจอเข้าสู่ระบบเจ้าหน้าที่ — ใช้รูปภาพที่กำหนดเอง (custom URL)
@@ -41,7 +41,7 @@ const STAFF_LOGIN_BG_SRC = "https://cdn.phototourl.com/free/2026-09-03-43a6baa9-
 // ต่อ WiFi โรงพยาบาลอยู่ก็อาจเข้าไม่ได้ด้วยถ้า IP นั้นเปลี่ยนไปหรือไฟร์วอลล์กั้นไว้
 // วิธีแก้ถาวรคือต้อง deploy แอปนี้ขึ้นที่อยู่สาธารณะแล้วใส่ URL นั้นไว้ตรงนี้
 // ==========================================================
-const PUBLIC_APP_BASE_URL = 'https://skh-xray-queue.vercel.app/?scan=1&qt=20260909';
+const PUBLIC_APP_BASE_URL = 'https://xrayq.skhospital.go.th';
 
 // ตรวจว่า URL ที่จะใช้สร้าง QR Code เป็นที่อยู่วงในหรือ localhost หรือไม่ (เข้าจาก
 // เน็ตมือถือภายนอกไม่ได้แน่นอน) เพื่อเตือนเจ้าหน้าที่ให้เห็นชัดๆ บนจอทีวีเลย แทนที่จะ
@@ -1813,7 +1813,7 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
                       </div>
                       <div className="mt-8 text-xl font-semibold text-white/60 tracking-widest flex items-center justify-center gap-2 uppercase">
                         <span className="w-3 h-3 rounded-full bg-[#ccff00] animate-pulse"></span>
-                        กำลังตรวจ
+                        กำลังซักประวัติ
                       </div>
                     </div>
                   ) : (

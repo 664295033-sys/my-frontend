@@ -41,7 +41,7 @@ const STAFF_LOGIN_BG_SRC = "https://cdn.phototourl.com/free/2026-09-03-43a6baa9-
 // ต่อ WiFi โรงพยาบาลอยู่ก็อาจเข้าไม่ได้ด้วยถ้า IP นั้นเปลี่ยนไปหรือไฟร์วอลล์กั้นไว้
 // วิธีแก้ถาวรคือต้อง deploy แอปนี้ขึ้นที่อยู่สาธารณะแล้วใส่ URL นั้นไว้ตรงนี้
 // ==========================================================
-const PUBLIC_APP_BASE_URL = 'https://xrayq.skhospital.go.th/';
+const PUBLIC_APP_BASE_URL = 'https://xrayq.skhospital.go.th';
 
 // ตรวจว่า URL ที่จะใช้สร้าง QR Code เป็นที่อยู่วงในหรือ localhost หรือไม่ (เข้าจาก
 // เน็ตมือถือภายนอกไม่ได้แน่นอน) เพื่อเตือนเจ้าหน้าที่ให้เห็นชัดๆ บนจอทีวีเลย แทนที่จะ
@@ -1711,7 +1711,7 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
             )}
             <div className="hidden sm:block text-left">
               <span className="text-xs font-bold text-emerald-600 block tracking-wider uppercase">X-Ray Department</span>
-              <span className="text-[30px] text-black block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
+              <span className="text-[29.5px] text-black block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
             </div>
           </div>
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
@@ -1938,7 +1938,16 @@ function MobileQueueView() {
     setDownloadingImage(true);
     try {
       const html2canvas = await loadHtml2Canvas();
-      const canvas = await html2canvas(pageCaptureRef.current, { backgroundColor: '#ffffff', scale: 2, useCORS: true });
+      // useCORS: true ให้ลองโหลดรูปโลโก้จาก CDN ภายนอกแบบข้าม origin ก่อน แต่เผื่อกรณี
+      // เซิร์ฟเวอร์ CDN นั้นไม่ได้ตั้งค่า CORS header ไว้ (ทำให้รูปโหลดไม่ได้และอาจทำให้
+      // ส่วนอื่นของภาพเพี้ยน/ดำไปด้วย) จึงเพิ่ม ignoreElements ไว้เป็นตาข่ายนิรภัย: ถ้ารูปจาก
+      // โดเมนนี้โหลดไม่สำเร็จ ให้ตัดรูปนั้นออกจากภาพไปเลย ดีกว่าปล่อยให้พังทั้งภาพ
+      const canvas = await html2canvas(pageCaptureRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+        ignoreElements: (el) => el.tagName === 'IMG' && typeof el.src === 'string' && el.src.includes('phototourl.com') && !el.complete,
+      });
       canvas.toBlob(async (blob) => {
         if (!blob) { setDownloadingImage(false); return; }
         const fileName = `คิวเอกซเรย์-${myQueue.queue_no}.png`;
@@ -2143,6 +2152,7 @@ function MobileQueueView() {
               <img
                 src={HOSPITAL_LOGO_GREEN_SRC}
                 alt="โลโก้โรงพยาบาลสงขลา"
+                crossOrigin="anonymous"
                 className="w-full h-full object-contain p-1"
               />
             </div>
@@ -2202,8 +2212,8 @@ function MobileQueueView() {
                 <div className="bg-white border border-gray-100 rounded-3xl p-6 text-center shadow-sm relative overflow-hidden">
                   <XRayIcon size={120} className="absolute -right-6 -top-6 text-emerald-50 pointer-events-none" />
                   {scanTime && (
-                    <div className="absolute top-0 right-0 bg-gray-50 text-gray-500 text-[10px] font-semibold px-3 py-1.5 rounded-bl-2xl tracking-wide">
-                      สแกนเมื่อ {scanDateOnly} {scanTime}
+                    <div className="relative mb-3 text-[11px] text-gray-500 font-semibold bg-gray-50 rounded-full px-3 py-1.5 inline-block">
+                      สแกนเมื่อ {scanDateOnly} • {scanTime}
                     </div>
                   )}
                   <span className="relative text-[11px] text-gray-400 font-semibold flex items-center justify-center gap-1 uppercase tracking-widest mb-2">

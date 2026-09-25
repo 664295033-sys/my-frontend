@@ -41,7 +41,7 @@ const STAFF_LOGIN_BG_SRC = "https://cdn.phototourl.com/free/2026-09-03-43a6baa9-
 // ต่อ WiFi โรงพยาบาลอยู่ก็อาจเข้าไม่ได้ด้วยถ้า IP นั้นเปลี่ยนไปหรือไฟร์วอลล์กั้นไว้
 // วิธีแก้ถาวรคือต้อง deploy แอปนี้ขึ้นที่อยู่สาธารณะแล้วใส่ URL นั้นไว้ตรงนี้
 // ==========================================================
-const PUBLIC_APP_BASE_URL = 'https://xrayq.skhospital.go.th';
+const PUBLIC_APP_BASE_URL = 'https://skh-xray-queue.vercel.app/?scan=1&qt=20260909';
 
 // ตรวจว่า URL ที่จะใช้สร้าง QR Code เป็นที่อยู่วงในหรือ localhost หรือไม่ (เข้าจาก
 // เน็ตมือถือภายนอกไม่ได้แน่นอน) เพื่อเตือนเจ้าหน้าที่ให้เห็นชัดๆ บนจอทีวีเลย แทนที่จะ
@@ -470,6 +470,28 @@ function loadHtml2Canvas() {
     document.head.appendChild(script);
   });
   return html2canvasLoadingPromise;
+}
+
+// ==========================================================
+// รอให้ <img> ทุกตัวในกล่องที่จะบันทึกภาพ "โหลดเสร็จจริงๆ" (ไม่ว่าจะสำเร็จหรือ error)
+// ก่อนเรียก html2canvas เสมอ — สาเหตุที่ภาพที่บันทึกได้บางครั้งขาดหัวข้อ/โลโก้ไปทั้งท่อน
+// คือ html2canvas เริ่มวาดภาพไปพร้อมๆ กับที่รูปโลโก้ยังโหลดไม่เสร็จ (เข้าจังหวะ race
+// condition) ทำให้บางส่วนของหน้าที่ยังไม่พร้อมถูกตัดหายไปจากภาพที่ได้ การรอให้รูปทุกตัว
+// นิ่ง (โหลดเสร็จ หรือ error ก็ยังนับว่า "นิ่งแล้ว") ก่อน ช่วยตัดปัญหานี้ได้เกือบทั้งหมด
+// ใส่ timeout กันไว้ด้วยเผื่อกรณีเน็ตช้ามากๆ ไม่ให้ปุ่มบันทึกภาพค้างรอตลอดไป
+// ==========================================================
+function waitForImagesToSettle(container, timeoutMs = 6000) {
+  if (!container) return Promise.resolve();
+  const imgs = Array.from(container.querySelectorAll('img'));
+  return Promise.all(imgs.map((img) => {
+    if (img.complete) return Promise.resolve();
+    return new Promise((resolve) => {
+      const done = () => resolve();
+      img.addEventListener('load', done, { once: true });
+      img.addEventListener('error', done, { once: true });
+      setTimeout(done, timeoutMs);
+    });
+  }));
 }
 
 let xlsxLoadingPromise = null;
@@ -1813,7 +1835,7 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
                       </div>
                       <div className="mt-8 text-xl font-semibold text-white/60 tracking-widest flex items-center justify-center gap-2 uppercase">
                         <span className="w-3 h-3 rounded-full bg-[#ccff00] animate-pulse"></span>
-                        กำลังซักประวัติ
+                        กำลังตรวจ
                       </div>
                     </div>
                   ) : (
@@ -1964,15 +1986,21 @@ function MobileQueueView() {
     setDownloadingImage(true);
     try {
       const html2canvas = await loadHtml2Canvas();
+      // รอให้รูปภาพทุกตัว (รวมโลโก้) โหลดนิ่งก่อนเสมอ ป้องกัน html2canvas เริ่มวาดภาพ
+      // ไปพร้อมๆ กับที่โลโก้ยังโหลดไม่เสร็จ ซึ่งเป็นสาเหตุหลักที่เคยทำให้ภาพที่บันทึกขาด
+      // ส่วนหัว (โลโก้/วันที่) หายไปทั้งท่อน
+      await waitForImagesToSettle(pageCaptureRef.current);
       // useCORS: true ให้ลองโหลดรูปโลโก้จาก CDN ภายนอกแบบข้าม origin ก่อน แต่เผื่อกรณี
       // เซิร์ฟเวอร์ CDN นั้นไม่ได้ตั้งค่า CORS header ไว้ (ทำให้รูปโหลดไม่ได้และอาจทำให้
-      // ส่วนอื่นของภาพเพี้ยน/ดำไปด้วย) จึงเพิ่ม ignoreElements ไว้เป็นตาข่ายนิรภัย: ถ้ารูปจาก
-      // โดเมนนี้โหลดไม่สำเร็จ ให้ตัดรูปนั้นออกจากภาพไปเลย ดีกว่าปล่อยให้พังทั้งภาพ
+      // ส่วนอื่นของภาพเพี้ยน/ดำไปด้วย) จึงเพิ่ม ignoreElements ไว้เป็นตาข่ายนิรภัย: รูปใดๆ
+      // ที่โหลดไม่สำเร็จจริงๆ (ไม่ใช่แค่โดเมน phototourl.com) จะถูกตัดออกจากภาพไปเลย
+      // ดีกว่าปล่อยให้พังทั้งภาพ
       const canvas = await html2canvas(pageCaptureRef.current, {
         backgroundColor: '#ffffff',
         scale: 2,
         useCORS: true,
-        ignoreElements: (el) => el.tagName === 'IMG' && typeof el.src === 'string' && el.src.includes('phototourl.com') && !el.complete,
+        imageTimeout: 8000,
+        ignoreElements: (el) => el.tagName === 'IMG' && (!el.complete || el.naturalWidth === 0),
       });
       canvas.toBlob(async (blob) => {
         if (!blob) { setDownloadingImage(false); return; }

@@ -41,7 +41,7 @@ const STAFF_LOGIN_BG_SRC = "https://cdn.phototourl.com/free/2026-09-03-43a6baa9-
 // ต่อ WiFi โรงพยาบาลอยู่ก็อาจเข้าไม่ได้ด้วยถ้า IP นั้นเปลี่ยนไปหรือไฟร์วอลล์กั้นไว้
 // วิธีแก้ถาวรคือต้อง deploy แอปนี้ขึ้นที่อยู่สาธารณะแล้วใส่ URL นั้นไว้ตรงนี้
 // ==========================================================
-const PUBLIC_APP_BASE_URL = 'https://xrayq.skhospital.go.th';
+const PUBLIC_APP_BASE_URL = 'https://skh-xray-queue.vercel.app/?scan=1&qt=20260909';
 
 // ตรวจว่า URL ที่จะใช้สร้าง QR Code เป็นที่อยู่วงในหรือ localhost หรือไม่ (เข้าจาก
 // เน็ตมือถือภายนอกไม่ได้แน่นอน) เพื่อเตือนเจ้าหน้าที่ให้เห็นชัดๆ บนจอทีวีเลย แทนที่จะ
@@ -1564,8 +1564,8 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
   useEffect(() => {
     const clockTimer = setInterval(() => {
       const now = new Date();
-      setTimeString(now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      setDateString(now.toLocaleDateString('th-TH', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }));
+      setTimeString(formatThaiTime(now));
+      setDateString(formatThaiDate(now));
     }, 1000);
     const tokenTimer = setInterval(() => setQrToken(getTodayToken()), 60000);
     return () => {
@@ -1737,7 +1737,7 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
             )}
             <div className="hidden sm:block text-left">
               <span className="text-xs font-bold text-emerald-600 block tracking-wider uppercase">X-Ray Department</span>
-              <span className="text-[27.5px] text-black block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
+              <span className="text-[20px] text-black block font-medium">แผนกเอกซเรย์ โรงพยาบาลสงขลา</span>
             </div>
           </div>
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
@@ -1813,7 +1813,7 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
                       </div>
                       <div className="mt-8 text-xl font-semibold text-white/60 tracking-widest flex items-center justify-center gap-2 uppercase">
                         <span className="w-3 h-3 rounded-full bg-[#ccff00] animate-pulse"></span>
-                        กำลังซักประวัติ
+                        กำลังตรวจ
                       </div>
                     </div>
                   ) : (
@@ -1933,7 +1933,7 @@ function MobileQueueView() {
   const [scanTime, setScanTime] = useState(() => {
     const stored = getStoredQueueRef();
     if (stored && stored.scannedAt) {
-      return new Date(stored.scannedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      return formatThaiTime(new Date(stored.scannedAt));
     }
     return null;
   });
@@ -1942,7 +1942,7 @@ function MobileQueueView() {
   const [scanDateOnly, setScanDateOnly] = useState(() => {
     const stored = getStoredQueueRef();
     if (stored && stored.scannedAt) {
-      return new Date(stored.scannedAt).toLocaleDateString('th-TH', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+      return formatThaiDate(new Date(stored.scannedAt));
     }
     return null;
   });
@@ -2006,8 +2006,8 @@ function MobileQueueView() {
   useEffect(() => {
     const timer = setInterval(() => {
       const now = new Date();
-      setTimeString(now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-      setDateString(now.toLocaleDateString('th-TH', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }));
+      setTimeString(formatThaiTime(now));
+      setDateString(formatThaiDate(now));
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -2037,8 +2037,8 @@ function MobileQueueView() {
     // เครื่องผู้ป่วยกดปุ่ม เผื่อกรณีเน็ตช้า/ล่าช้า ให้วันที่-เวลาที่โชว์ตรงกับข้อมูลจริงเสมอ
     const scannedAtIso = queue.created_at || new Date().toISOString();
     const scannedAtDate = new Date(scannedAtIso);
-    setScanTime(scannedAtDate.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-    setScanDateOnly(scannedAtDate.toLocaleDateString('th-TH', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }));
+    setScanTime(formatThaiTime(scannedAtDate));
+    setScanDateOnly(formatThaiDate(scannedAtDate));
     lastStatusRef.current = queue.status;
     setSelectedQueueId(queue.id);
     setShowForm(false);

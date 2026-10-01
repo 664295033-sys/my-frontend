@@ -41,7 +41,7 @@ const STAFF_LOGIN_BG_SRC = "https://cdn.phototourl.com/free/2026-09-03-43a6baa9-
 // ต่อ WiFi โรงพยาบาลอยู่ก็อาจเข้าไม่ได้ด้วยถ้า IP นั้นเปลี่ยนไปหรือไฟร์วอลล์กั้นไว้
 // วิธีแก้ถาวรคือต้อง deploy แอปนี้ขึ้นที่อยู่สาธารณะแล้วใส่ URL นั้นไว้ตรงนี้
 // ==========================================================
-const PUBLIC_APP_BASE_URL = 'https://skh-xray-queue.vercel.app/?scan=1&qt=20260909';
+const PUBLIC_APP_BASE_URL = 'https://xrayq.skhospital.go.th';
 
 // ตรวจว่า URL ที่จะใช้สร้าง QR Code เป็นที่อยู่วงในหรือ localhost หรือไม่ (เข้าจาก
 // เน็ตมือถือภายนอกไม่ได้แน่นอน) เพื่อเตือนเจ้าหน้าที่ให้เห็นชัดๆ บนจอทีวีเลย แทนที่จะ
@@ -1771,9 +1771,9 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
               <button
                 onClick={handleLoginButtonClick}
                 title="เข้าสู่ระบบเจ้าหน้าที่"
-                className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center bg-white border-2 border-emerald-100 shadow-md transition active:scale-95 p-1"
+                className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center bg-white border-2 border-emerald-100 shadow-md transition active:scale-95 p-1 text-emerald-600"
               >
-                <img src={HOSPITAL_LOGO_GREEN_SRC} alt="เข้าสู่ระบบเจ้าหน้าที่" className="w-full h-full object-contain" />
+                <UserIcon size={28} />
               </button>
             )}
             <button
@@ -1835,7 +1835,7 @@ function DisplayView({ onExit, showLoginButton, onLoginClick }) {
                       </div>
                       <div className="mt-8 text-xl font-semibold text-white/60 tracking-widest flex items-center justify-center gap-2 uppercase">
                         <span className="w-3 h-3 rounded-full bg-[#ccff00] animate-pulse"></span>
-                        กำลังตรวจ
+                        กำลังซักประวัติ
                       </div>
                     </div>
                   ) : (
